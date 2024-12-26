@@ -84,8 +84,10 @@ def Duplication_Record(Hymns_List):
     return record
 
 def Show_Duplications(record, Hymns_List):
+    confirmation = False
     for key, value in record.items():
         if len(value) > 1:
+            confirmation = True
             mess = f"El himno == {Hymns_List[value[0]][1]} == se repite {len(value)} veces, los dias:\n"
             for val in value:
                 mess+=Hymns_List[val][2]
@@ -93,6 +95,7 @@ def Show_Duplications(record, Hymns_List):
             print(mess)
             input("Continuar...")
             os.system('cls')
+    return confirmation
 
 def main():
     file_name = File_Searcher()
@@ -106,9 +109,11 @@ def main():
         else:
             os.system('cls')
             break
-    
-    record = Duplication_Record(Hymns_List)
-    Show_Duplications(record, Hymns_List)
 
+    record = Duplication_Record(Hymns_List)    
+    if not Show_Duplications(record, Hymns_List):
+        input("No se encontraron duplicaciones...")
+    
+    
 if __name__ == "__main__":
     main()

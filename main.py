@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-ans_y=('s', 'S', '1')
+ans_y=('s', 'S', '1', 'si', 'SI')
 
 def File_Searcher():
     while True:
@@ -12,8 +12,7 @@ def File_Searcher():
         else:    
             return file_name
 
-
-while True:
+def Mistake_Searcher(file_name):
     mistake = False
     df = pd.read_excel(f'{file_name}.xlsx')
     l_ind = pd.read_excel("Indice.xlsx")
@@ -66,33 +65,50 @@ while True:
                             break
                     else:
                         break
-    if mistake:
-        ans = input("Desea corregir los datos?: ")
-        if ans not in ans_y:
+    return Hymns_List, mistake
+
+def Correction_Query():
+    ans = input("Desea corregir los datos?: ")
+    return ans in ans_y
+
+
+def Duplication_Record(Hymns_List):
+    record = {}
+
+    for i, himno in enumerate(Hymns_List):
+        num, title, dia = himno
+        if not record.get(num):
+            record[num] = [i]
+        else:
+            record[num].append(i)
+    return record
+
+def Show_Duplications(record, Hymns_List):
+    for key, value in record.items():
+        if len(value) > 1:
+            mess = f"El himno == {Hymns_List[value[0]][1]} == se repite {len(value)} veces, los dias:\n"
+            for val in value:
+                mess+=Hymns_List[val][2]
+                mess+="\n"
+            print(mess)
+            input("Continuar...")
+            os.system('cls')
+
+def main():
+    file_name = File_Searcher()
+
+    while True:
+        Hymns_List, mistake = Mistake_Searcher(file_name)
+        if mistake:
+            if not Correction_Query():
+                os.system('cls')
+                break
+        else:
             os.system('cls')
             break
-    else:
-        os.system('cls')
-        break
-    os.system('cls')
     
+    record = Duplication_Record(Hymns_List)
+    Show_Duplications(record, Hymns_List)
 
-
-Registro_Times = {}
-
-for i, himno in enumerate(Hymns_List):
-    num, title, dia = himno
-    if not Registro_Times.get(num):
-        Registro_Times[num] = [i]
-    else:
-        Registro_Times[num].append(i)
-
-for key, value in Registro_Times.items():
-    if len(value) > 1:
-        mess = f"El himno == {Hymns_List[value[0]][1]} == se repite {len(value)} veces, los dias:\n"
-        for val in value:
-            mess+=Hymns_List[val][2]
-            mess+="\n"
-        print(mess)
-        input("Continuar...")
-        os.system('cls')
+if __name__ == "__main__":
+    main()

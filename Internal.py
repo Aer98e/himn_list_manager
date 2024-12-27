@@ -24,5 +24,5 @@ def Update_Record(record):
     _Save_Previous_Record()
 
     with open('Frecuency_Master_Record.pkl', 'wb') as file:
-        record = pickle.load(file)
+        pickle.dump(record, file)
     print("Archivo guardado con exito")

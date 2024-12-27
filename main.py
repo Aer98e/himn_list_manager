@@ -124,6 +124,10 @@ def Show_Record_Statistic(l_ind, record_master):
                 statistic['used'].append(text)
     
     def Printer_ST():
+        if not statistic['used'] and not statistic['not_used']:
+            print("No hay descompensacion en el uso de los himnos")
+            return None
+        
         print("===========ESTADÍSTICAS============\n")
         for text in statistic['used']:
             print(text)
@@ -134,6 +138,10 @@ def Show_Record_Statistic(l_ind, record_master):
     Filtering_According_Incidents()
     Printer_ST()
 
+def Record_Update_Query(ans_y, record_master):
+    ans = input("Desea hacer una actualizacion del registro maestro?: ").strip()
+    if ans in ans_y:
+        Internal.Update_Record(record_master)
 
 def main():
     ans_y=('s', 'S', '1', 'si', 'SI')
@@ -157,6 +165,8 @@ def main():
 
     record_master = Record_Status_Updater(Frecuency_Master_Record.copy(),record)
     Show_Record_Statistic(l_ind, record_master)
+    Record_Update_Query(ans_y, record_master)
+
     
 if __name__ == "__main__":
     main()

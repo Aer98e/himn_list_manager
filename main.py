@@ -1,7 +1,9 @@
 import pandas as pd
 import os
+import Internal
 
-ans_y=('s', 'S', '1', 'si', 'SI')
+
+
 
 def File_Searcher():
     while True:
@@ -12,10 +14,9 @@ def File_Searcher():
         else:    
             return file_name
 
-def Mistake_Searcher(file_name):
+def Mistake_Searcher(file_name, l_ind):
     mistake = False
     df = pd.read_excel(f'{file_name}.xlsx')
-    l_ind = pd.read_excel("Indice.xlsx")
     df = df.fillna('')
     l_ind = l_ind.fillna('')
     
@@ -67,10 +68,9 @@ def Mistake_Searcher(file_name):
                         break
     return Hymns_List, mistake
 
-def Correction_Query():
+def Correction_Query(ans_y):
     ans = input("Desea corregir los datos?: ")
     return ans in ans_y
-
 
 def Duplication_Record(Hymns_List):
     record = {}
@@ -97,13 +97,54 @@ def Show_Duplications(record, Hymns_List):
             os.system('cls')
     return confirmation
 
+def Record_Status_Updater(record_master:dict, record:dict):
+    for key in record_master:
+        if key in record:
+            repetitions = len(record[key])
+            record_master[key][1] += repetitions
+            record_master[key][0] = 1 if record_master[key][0] < 0 else record_master[key][0] + 1
+        else:
+            record_master[key][0] = 0 if record_master[key][0] > 0 else record_master[key][0] - 1
+    return record_master
+
+def Show_Record_Statistic(l_ind, record_master):
+    statistic = {'used':[], 'not_used':[]}
+
+    def Filtering_According_Incidents():
+        for element in record_master:
+            incidence = record_master[element][0]
+            title = l_ind[l_ind['N'] == element]['NOMBRE'].values[0]
+
+            if incidence < -1:
+                text = f"El himno {title} se no se ha usado en las {incidence * -1} ultimas hojas"
+                statistic['not_used'].append(text)
+            
+            elif incidence > 1:
+                text = f"El himno {title} ya se ha usado en las {incidence} ultimas hojas"
+                statistic['used'].append(text)
+    
+    def Printer_ST():
+        print("===========ESTADÍSTICAS============\n")
+        for text in statistic['used']:
+            print(text)
+        print()
+        for text in statistic['not_used']:
+            print(text)
+
+    Filtering_According_Incidents()
+    Printer_ST()
+
+
 def main():
+    ans_y=('s', 'S', '1', 'si', 'SI')
+    Frecuency_Master_Record = Internal.Read_Record()
     file_name = File_Searcher()
+    l_ind = pd.read_excel("Indice.xlsx")
 
     while True:
-        Hymns_List, mistake = Mistake_Searcher(file_name)
+        Hymns_List, mistake = Mistake_Searcher(file_name, l_ind)
         if mistake:
-            if not Correction_Query():
+            if not Correction_Query(ans_y):
                 os.system('cls')
                 break
         else:
@@ -113,7 +154,9 @@ def main():
     record = Duplication_Record(Hymns_List)    
     if not Show_Duplications(record, Hymns_List):
         input("No se encontraron duplicaciones...")
-    
+
+    record_master = Record_Status_Updater(Frecuency_Master_Record.copy(),record)
+    Show_Record_Statistic(l_ind, record_master)
     
 if __name__ == "__main__":
     main()

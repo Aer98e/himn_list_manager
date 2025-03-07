@@ -143,6 +143,27 @@ def Record_Update_Query(ans_y, record_master):
     if ans in ans_y:
         Internal.Update_Record(record_master)
 
+
+def Mostrar_Frecuencai_Real():
+    Frecuency_Master_Record:dict = Internal.Read_Record()
+    l_ind = pd.read_excel("Indice.xlsx")
+
+    suma_tot=0
+    muestra_total=len(Frecuency_Master_Record)
+    max = 0
+    for tuple_dat in Frecuency_Master_Record.values():
+        suma_tot += tuple_dat[1]
+        max = tuple_dat[1] if tuple_dat[1] > max else max
+
+    for i in range(max, -1, -1):
+        print(f"\n\nHimnos usados {i} veces: ")
+        for num_ind, tuple_dat in Frecuency_Master_Record.items():
+            if tuple_dat[1] == i:
+                title = l_ind[l_ind['N'] == num_ind]['NOMBRE'].values[0]
+                print(f'Himno {title}')
+    
+    print(f"\n El promedio real es {suma_tot/muestra_total}")
+
 def main():
     ans_y=('s', 'S', '1', 'si', 'SI')
     Frecuency_Master_Record = Internal.Read_Record()

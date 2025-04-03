@@ -7,6 +7,7 @@ import re
 import unicodedata
 import sqlite3
 import sys
+import difflib
 
 ans_y = ('y', 's', '1', 'yes', 'si')
 
@@ -14,6 +15,7 @@ def limpiar_texto1(texto):
     texto = texto.lower()
     texto = re.sub(r'[^\w\s]', '', texto)
     texto = re.sub(r'\s+', '', texto)
+    texto = unicodedata.normalize('NFD', texto).encode('ascii', 'ignore').decode('utf-8')
     
     return texto
 
@@ -25,6 +27,54 @@ def limpiar_texto2(texto):
     texto_limpio = re.sub(r'[^a-zA-Z\s]', '', texto_sin_tildes)
 
     return texto_limpio
+
+
+class Management_Text():
+
+    @staticmethod
+    def limpiar_texto1(texto):
+        texto = texto.lower()
+        texto = re.sub(r'[^\w\s]', '', texto)
+        texto = re.sub(r'\s+', '', texto)
+        texto = unicodedata.normalize('NFD', texto).encode('ascii', 'ignore').decode('utf-8')
+        
+        return texto
+
+    @staticmethod
+    def limpiar_texto2(texto):
+        # Eliminar tildes y acentos
+        texto_sin_tildes = unicodedata.normalize('NFD', texto).encode('ascii', 'ignore').decode('utf-8')
+
+        # Eliminar caracteres no deseados (comas, puntos, signos, etc.)
+        texto_limpio = re.sub(r'[^a-zA-Z\s]', '', texto_sin_tildes)
+
+        return texto_limpio
+
+    @staticmethod
+    def _compare_two_text(textM:str, textS:str):
+        simi = difflib.SequenceMatcher(None, textM, textS)
+        return simi.ratio()
+
+    @classmethod
+    def search_coindicenses(cls, text_list:list, searched:str):
+        """Esta funcion se encarga de revisar la similitud de una palabra con una lista de palabras.
+        Arg:
+            text_list: La lista de palabras que se deben revisar.
+            searched: la palabra que se buscara.
+
+        Returns:
+            [(ratio, index)...] -> ratio es la similitud[0-1], y index el indice de la lista a quien corresponde ratio.
+            esta lista de tuplas esta ordenana desendentemente(ratio).
+        
+        """
+        coincidences=[]
+        
+        for i in range(len(text_list)):
+            ratio_coin = cls._compare_two_text(text_list[i], searched)
+            coincidences.append((ratio_coin, i))
+        
+        coincidences_or = sorted(coincidences, key=lambda x: x[0], reverse=True)
+        return coincidences_or
 
 class Sa_Lo_Objects():
     ans_y = ('y', 's', '1', 'yes', 'si')
@@ -55,7 +105,7 @@ class Sa_Lo_Objects():
             file = cls._exist_file(files, name)
             if file:
                 ans = input("El archivo que deseas agregar ya existe, deseas sobreescribirlo?: ")
-                if ans.lower() in cls.ans_y:
+                if ans.lower() not in cls.ans_y:
                     path_f=os.path.join(cls.path[0], file)
                     path_del=os.path.join(cls.path[1], file)
                     try:
@@ -291,6 +341,20 @@ class Compare_texts():
                 break
 
 class Management_SQLite():
+    
+    @staticmethod
+    def analize_table_DB(name_DB, tableDB):
+        conn = sqlite3.connect(name_DB)
+        cursor = conn.cursor()
+
+        print(f"\nEstructura de la tabla {tableDB}:")
+        cursor.execute(f"PRAGMA table_info({tableDB});")
+        columnas = cursor.fetchall()
+        for columna in columnas:
+            print(columna)
+
+        conn.close()
+
     @staticmethod
     def Analize_DB(name_DB):
         conn = sqlite3.connect(name_DB)
@@ -393,32 +457,48 @@ def main():
                 ''',(dat[1], dat[0])
                 )
             conn.commit()
-    
-    compositores = []
-    escritores = []
-    titulo_mus = []
-    ritmos = []
 
-    titulos = Management_SQLite.Buscar_Columna('Registro_Himnos.db', 'Registro_Hymn', 'title')
-    for ti in titulos:
-    
-        print(Management_SQLite.Buscar_Coincidencia('header', ('Registro_Himnos.db', 'Registro_Hymn'), ('title', ti)))
-    
-        compositor = input('Compositor: ').strip()
-        escritor = input('Escritor: ').strip()
-        ritmo = input('ritmo: ').strip()
-        title_mus = input('title_mus: ').strip()
+    def Correction_DF():
+        indice = pd.read_excel('Indice_2.xlsx')
+        titulosS = indice['NOMBRE'].to_list()
+        titulosM = Management_SQLite.Buscar_Columna("Registro_Himnos.db", 'Registro_Hymn', 'title')
+        titulosSN = [Management_Text.limpiar_texto1(tit) for tit in titulosS]
+        titulosMN = [Management_Text.limpiar_texto1(tit) for tit in titulosM]
         
-        compositores.append((ti, compositor))
-        escritores.append((ti, escritor))
-        titulo_mus.append((ti, title_mus))
-        ritmos.append((ti, ritmo))
+        for i, revise in enumerate(titulosS):
+            if revise not in titulosM:
+                coincidencias = Management_Text.search_coindicenses(titulosMN, titulosSN[i])
+                for coin in coincidencias:
+                    if coin[0] == 1.0:
+                        indice.at[i, 'NOMBRE'] = titulosM[coin[1]]
+                        break
+                    ans = input(f"El himno '{titulosS[i]}' se refiere a '{titulosM[coin[1]]}'?: ")
+                    if ans.lower() in ans_y:
+                        # input(f"Asignar {indice.at[i, 'NOMBRE']}, el valor de {titulosM[coin[1]]}")
+                        indice.at[i, 'NOMBRE'] = titulosM[coin[1]]
+                        break
+        indice.to_excel('Indice_2.xlsx', index=False)
 
-    Sa_Lo_Objects.saved_object(compositores, "compositores")
-    Sa_Lo_Objects.saved_object(escritores, "escritores")
-    Sa_Lo_Objects.saved_object(titulo_mus, "titulo_mus")
-    Sa_Lo_Objects.saved_object(ritmos, "ritmos")
+    def comparate_list(lista_1, lista_2, ind):
+        if len(lista_1) == len(lista_2):
+            for i in range(len(lista_1)):
+                if lista_1[i][ind] != lista_2[i][ind]:
+                    print(f'LISTA DIFIERE EN EL ELEMENTO {i}]')
+                    return False
+        else:
+            print("LISTAS NO TIENEN LA MISMA CANTIDAD DE ELEMENTOS.")
+            return False
+        return True
 
-        
+    # Management_SQLite.Analize_DB("Registro_General_Himnos_2.db")
+    # indices = Sa_Lo_Objects.load_object('indices_himnos')
+    
+    
+    
+   
+            
+                  
+
+
 if __name__ == "__main__":
     main() 

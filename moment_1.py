@@ -1,9 +1,18 @@
 import pandas as pd
 import Internal
 import sys
-import recicle
+import recicle as rec
 import sqlite3
 from  difflib import SequenceMatcher
+from recicle import Management_Text as Text
+from recicle import Management_SQLite as M_SQ
+import datetime
+from os import system
+import re
+
+R_GENERAL = 'Registro_General_Himnos_2.db'
+R_BUSQUEDA = 'search_ref.db'
+COL_TIT = 0
 
 
 def Extraer_Cuadros(file):
@@ -32,75 +41,164 @@ def Extraer_Cuadros(file):
                             break
                 cuadrosDF.append(data_f.iloc[i:i+fila_aum, j-1:j+3].fillna("-"))
 
-    return cuadrosDF
+    return [cuadro for cuadro in cuadrosDF if len(cuadro) > 2]
 
-
-def Extraer_titulos_cuadro(cuadro, norm = True):
+def extract_table_titles(cuadro, norm = True):
     resultados=[]
     if len(cuadro)<2:
         return None
     
-    for i in range(1,len(cuadro)):
-        resultados.append(cuadro.iat[i,0])
+    for i in range(1, len(cuadro)):
+        resultados.append(cuadro.iat[i,COL_TIT])
     
     if norm:
-        data_norm = [(recicle.Management_Text.limpiar_texto1(res), res) for res in resultados]
+        data_norm = [(Text.limpiar_texto1(res), res) for res in resultados]
         resultados = data_norm
 
     return resultados
 
-
-def datos_busqueda():
-    with recicle.sqlite3.connect(R_BUSQUEDA) as conn:
+def find_simil(simil):
+    with sqlite3.connect(R_BUSQUEDA) as conn:
         cursor = conn.cursor()
         cursor.execute(
-        '''
-        SELECT Indice_busqueda.titulo_norm, Indice_busqueda.id, Himnos.titulo
-        FROM Indice_busqueda
-        JOIN Himnos ON Indice_Busqueda.id_himno = Himnos.id
-        ''')
-        resultados = cursor.fetchall()
-    return resultados
+            '''
+            SELECT Himnos.titulo
+            FROM Himnos
+            JOIN Indice_busqueda ON Himnos.id=Indice_busqueda.id_himno
+            WHERE Indice_busqueda.titulo_norm = ?
+            ''',(simil,))
+        res = cursor.fetchone()
+    return res[0]
 
-R_GENERAL = 'Registro_General_Himnos_2.db'
-R_BUSQUEDA = 'search_ref.db'
-TITULO = 2
-TITULO_NORM = 0
-INDICE = 1
-
-
-cuadros = Extraer_Cuadros('Himnos 2025 marzo.xlsx')
-
-li_tit_S = Extraer_titulos_cuadro(cuadros[1])
-
-li_dat_M = datos_busqueda()
-
-
-
-
-#El proposito sera encontrar el indice de cada uno de los himnos.
-for title_s in li_tit_S:
-    coincidences = []
-    print(f"::: Buscando ::: {title_s[1]}")
-    find = False
-    for m in li_dat_M:
-        if title_s[0] == m[TITULO_NORM]:
-            print("Encontrado...\n")
-            find = True
-            break
-            #REvisar que los datos sean correctos
+def update_search_list(title_norm, title_m):
+    with sqlite3.connect(R_BUSQUEDA) as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM Himnos WHERE titulo = ?', (title_m,))
+        indice = cursor.fetchone()
+        if indice is not None:
+            cursor.execute('INSERT INTO Indice_busqueda(id_himno, titulo_norm) VALUES(?, ?)', (indice[0], title_norm))
+            conn.commit()
         else:
-            simil = SequenceMatcher(None, m[TITULO_NORM], title_s[0]).ratio()
-            coincidences.append((simil, m[TITULO]))
-    if not find:
-        print(f'El himno {title_s[1]} no se encontró.')
-        coincidences_ord = sorted(coincidences, key = lambda x : x[0], reverse = True)
-        for i in range(5):
-            #Considerar ya no preguntar para coincidencais del 0.8
-            print(f'El titulo buscado podria referirse a ({coincidences_ord[i]})')
+            print(f'No se encontro :: {title_m}')
+
+def add_titles_stranges(cuadros):
+
+    li_tit_m = M_SQ.Buscar_Columna(R_BUSQUEDA, 'Indice_busqueda', 'titulo_norm')
+
+    for cuadro in cuadros:
+        system('cls')
+
+        if len(cuadro) < 2:#Para no buscar en una tabla vacia de menos de 2 filas
+            continue
+
+        for fila in range(1, len(cuadro)):
+            coincidences = []
+            title_s = cuadro.iat[fila, COL_TIT]
+            title_s_norm = Text.limpiar_texto1(title_s)
+
+            # print(f"::: Buscando ::: {title_s}")
+            find = False
+
+            for title_m_norm in li_tit_m:
+                if title_s_norm == title_m_norm:
+                    # print("Encontrado...\n")
+                    find = True
+                    break
+                    
+                else:
+                    simil = SequenceMatcher(None, title_m_norm, title_s_norm).ratio()
+                    coincidences.append((simil, title_m_norm))
+
+            if not find:
+                print(f'El himno {title_s} no se encontró.')
+                coincidences_ord = sorted(coincidences, key = lambda x : x[0], reverse = True)
+                for coin in coincidences_ord[0:5]:
+                    #Considerar ya no preguntar para coincidencais del 0.8
+                    tit_sim = find_simil(coin[1])
+
+                    print('==== ¿Son similares? ====')
+                    print(f'--{title_s}')
+                    print(f'--{tit_sim}')
+                    ans = input('_________________(S/N): ').strip()
+
+                    if ans.lower() in rec.ans_y:
+                        update_search_list(title_s_norm, tit_sim)
+                        cuadro.iat[fila, COL_TIT] = tit_sim
+                        break
+
+def _extract_days(cuadros):
+    days = []
+    for cuadro in cuadros:
+        day = cuadro.iat[0, 0]
+        day = str(day)
+        num = re.search(r'\d+', day)
+        if num is not None:
+            days.append(int(num[0]))
+        else:
+            print('Un cuadro no tiene fecha.')
+    return days
+
+def correction_days(cuadros, month = None, year = None):
+    dates = []
+
+    weeken=['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']
+    today = datetime.date.today()
+    
+
+    year = today.year if year is None else year
+    month = today.month if month is None else month
+
+    days_li = _extract_days(cuadros)
+    afternoon = False
+
+    for i, day in enumerate(days_li):
+        table_date = datetime.date(year, month, day)
+        if table_date < today:#El igual permitira trabajar ese mismo dia o no.
+            dates.append(None)
+        else:
+            day_ind = table_date.weekday()
+            temp_date = f'{weeken[day_ind]} {day:02}'
+
+            if afternoon:
+                dates.append(f'{temp_date} T')
+                afternoon = False
+            
+            elif i < len(days_li)-1:
+                if day == days_li[i+1]:
+                    day == days_li[i+1]
+                    dates.append(f'{temp_date} M')
+                    afternoon = True
+                    continue
+                dates.append(temp_date)
+            
+            else:
+                dates.append(temp_date)
+    return dates
+    
+def filter_tables_day(cuadros, corrector):
+    cuadros_new=[]
+    for i in range(len(cuadros)):
+        if corrector[i] is None:
+            continue
+        cuadros[i].iat[0, 0] = corrector[i]
+        cuadros_new.append(cuadros[i])
+    return cuadros_new
+
+    
+
+def main():
+    cuadros = Extraer_Cuadros('Himnos 2025 marzo.xlsx')
+    print(cuadros[0])
+    # add_titles_stranges(cuadros)
+    result = correction_days(cuadros)
+    cuadros_new = filter_tables_day(cuadros, result)
+    del cuadros
+
+
+    
 
 
 
 
-
-
+if __name__ == '__main__':
+    main()

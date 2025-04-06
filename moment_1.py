@@ -6,7 +6,9 @@ import sqlite3
 from  difflib import SequenceMatcher
 from recicle import Management_Text as Text
 from recicle import Management_SQLite as M_SQ
+import numpy as np
 import datetime
+from rapidfuzz import fuzz
 from os import system
 import re
 
@@ -15,43 +17,75 @@ R_BUSQUEDA = 'search_ref.db'
 COL_TIT = 0
 
 
-def Extraer_Cuadros(file):
-    data_f = pd.read_excel(file)
+def Extraer_Cuadros(file, identifier='R'):
+    """
+    Extracts rectangular sections (cuadros) from an Excel file based on a specific identifier.
+    This function reads an Excel file into a NumPy array and identifies regions of interest
+    starting with a specific identifier (default is 'R'). It dynamically determines the size
+    of each region and extracts it as a DataFrame.
+    Args:
+        file (str): The path to the Excel file to be processed.
+        identifier (str, optional): The identifier used to locate the starting points of the
+            regions of interest. Defaults to 'R'.
+    Returns:
+        list: A list of DataFrames, where each DataFrame represents a rectangular section
+        (cuadro) extracted from the Excel file. Only sections with more than 2 rows are included.
+    Notes:
+        - The function assumes that the identifier is located in a single cell and that the
+          region of interest extends downward until an empty or NaN cell is encountered.
+        - The extracted regions include two columns to the left of the identifier column.
+        - The function skips regions with 2 or fewer rows.
+    """
+    # Leer el archivo Excel en un DataFrame
+    df = pd.read_excel(file, header=None)
+    numpy_array = df.to_numpy()
 
-    cuadrosDF=[]
+    mask_R = numpy_array == identifier  # Crear una máscara para detectar 'R'
+    cuadros = []
 
-    for i in range(len(data_f)):
-        for j in range(len(data_f.columns)):
-            fila_aum = 1
-            if data_f.iat[i, j] == 'R':
-                continuar = True
-                while continuar:
-                    continuar = False
-                    for col_a in range(-1, 3):
-                        try:
-                            revise = data_f.iat[i + fila_aum, j + col_a]
-                        except IndexError:
-                            print(f"Índice fuera de rango en la fila {i + fila_aum}, columna {j + col_a}")
-                            break
-                        if revise !=  "" and pd.notna(revise):
-                            fila_aum += 1
-                            continuar = True
-                            break
-                cuadrosDF.append(data_f.iloc[i:i+fila_aum, j-1:j+3].fillna("-"))
+    # Iterar por las posiciones donde se encuentra 'R'
+    for row, col in np.argwhere(mask_R):  # `np.argwhere` encuentra las posiciones de 'R'
+        fila_aum = 0  # Contador de filas incluidas en el cuadro
+        while True:
+            # Verificar si estamos dentro del rango de filas y si la fila no está vacía
+            if row + fila_aum >= numpy_array.shape[0]:  # Evitar índice fuera de rango
+                break
+            cell_current = numpy_array[row + fila_aum, col-1]  # Seleccionar la fila actual
+            if pd.isna(cell_current) or cell_current=='':  # Si la fila está vacía, detener
+                break
+            fila_aum += 1  # Expandir el rango de filas hacia abajo
 
-    return [cuadro for cuadro in cuadrosDF if len(cuadro) > 2]
+        # Extraer el cuadro desde 'R' y las filas dinámicas encontradas
+        cuadro = numpy_array[row:row + fila_aum, col - 2:col]  # Ajustar columnas según lo necesario
+        if cuadro.shape[0] > 2:
+            cuadros.append(pd.DataFrame(cuadro))  # Convertir a DataFrame para procesarlo fácilmente
 
-def extract_table_titles(cuadro, norm = True):
+    return cuadros
+
+def extract_table_titles(cuadro:pd.DataFrame, ind_column:int, norm = True):
+    """
+    Extracts and optionally normalizes titles from a specified column in a DataFrame.
+    Args:
+        cuadro (pd.DataFrame): The DataFrame containing the data.
+        ind_column (int): The index of the column from which to extract titles.
+        norm (bool, optional): If True, normalizes the extracted titles using 
+            `Text.limpiar_texto1`. Defaults to True.
+    Returns:
+        list: A list of tuples containing normalized and original titles if `norm` is True,
+                or an list if `norm` is False.
+    """
     resultados=[]
-    if len(cuadro)<2:
-        return None
     
-    for i in range(1, len(cuadro)):
-        resultados.append(cuadro.iat[i,COL_TIT])
+    titles = cuadro.iloc[1:, ind_column].to_list()
+
     
     if norm:
-        data_norm = [(Text.limpiar_texto1(res), res) for res in resultados]
+        # data_norm = [(Text.limpiar_texto1(title), title) for title in titles]
+        data_norm = [Text.limpiar_texto1(title) for title in titles]
         resultados = data_norm
+
+    else:
+        return titles
 
     return resultados
 
@@ -68,61 +102,67 @@ def find_simil(simil):
         res = cursor.fetchone()
     return res[0]
 
-def update_search_list(title_norm, title_m):
+def update_search_list(title_norm, norm_match):
     with sqlite3.connect(R_BUSQUEDA) as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT id FROM Himnos WHERE titulo = ?', (title_m,))
+        cursor.execute('SELECT id_himno FROM Indice_busqueda WHERE titulo_norm = ?', (norm_match,))
         indice = cursor.fetchone()
         if indice is not None:
             cursor.execute('INSERT INTO Indice_busqueda(id_himno, titulo_norm) VALUES(?, ?)', (indice[0], title_norm))
             conn.commit()
         else:
-            print(f'No se encontro :: {title_m}')
+            print(f'No se encontro :: {norm_match} en la base de datos.')
 
 def add_titles_stranges(cuadros):
 
-    li_tit_m = M_SQ.Buscar_Columna(R_BUSQUEDA, 'Indice_busqueda', 'titulo_norm')
+    master_list_NORM = M_SQ.Buscar_Columna(R_BUSQUEDA, 'Indice_busqueda', 'titulo_norm')
+    master_set = {title for title in master_list_NORM}
 
     for cuadro in cuadros:
-        system('cls')
+        slaves_list = extract_table_titles(cuadro, 1, norm=False)
+        slave_cache={Text.limpiar_texto1(title): title for title in slaves_list}
 
-        if len(cuadro) < 2:#Para no buscar en una tabla vacia de menos de 2 filas
-            continue
+        for slave_title in slave_cache:
+            if slave_title in master_set:
+                continue
+                
+            else:
+                find = False
+                print('----------------------------------')
+                print(f'Buscando "{slave_cache[slave_title]}" ...')
+                print('----------------------------------')
 
-        for fila in range(1, len(cuadro)):
-            coincidences = []
-            title_s = cuadro.iat[fila, COL_TIT]
-            title_s_norm = Text.limpiar_texto1(title_s)
+                best_matches = []
 
-            # print(f"::: Buscando ::: {title_s}")
-            find = False
+                for master_title in master_set:
+                    sim_ratio = fuzz.ratio(master_title, slave_title, score_cutoff=60)
+                    if sim_ratio > 0:
+                        best_matches.append((sim_ratio, master_title))
 
-            for title_m_norm in li_tit_m:
-                if title_s_norm == title_m_norm:
-                    # print("Encontrado...\n")
+                if not best_matches:
+                    print('No hay similitudes mayores a 60, reescirbir el himno')
+                    print('================================================================================')
+                    continue
+
+                similares_ord = sorted(best_matches, key=lambda x: x[0], reverse=True)
+                for match in similares_ord:
+                    if match[0] < 85:
+                        possible_match = find_simil(match[1])
+                        print("Son el mismo himno?")
+                        print(f'--{slave_cache[slave_title]}')
+                        print(f'--{possible_match}')	
+                        ans = input('_________________(S/N): ').strip()
+                        print("") #Solo un salto de linea
+                        if ans.lower() not in rec.ans_y:
+                            continue
                     find = True
+                    update_search_list(slave_title, match[1])
                     break
-                    
-                else:
-                    simil = SequenceMatcher(None, title_m_norm, title_s_norm).ratio()
-                    coincidences.append((simil, title_m_norm))
 
-            if not find:
-                print(f'El himno {title_s} no se encontró.')
-                coincidences_ord = sorted(coincidences, key = lambda x : x[0], reverse = True)
-                for coin in coincidences_ord[0:5]:
-                    #Considerar ya no preguntar para coincidencais del 0.8
-                    tit_sim = find_simil(coin[1])
+                if not find:    
+                    print(f'No se encontraron similares para {slave_cache[slave_title]}')
+                    print('================================================================================')
 
-                    print('==== ¿Son similares? ====')
-                    print(f'--{title_s}')
-                    print(f'--{tit_sim}')
-                    ans = input('_________________(S/N): ').strip()
-
-                    if ans.lower() in rec.ans_y:
-                        update_search_list(title_s_norm, tit_sim)
-                        cuadro.iat[fila, COL_TIT] = tit_sim
-                        break
 
 def correction_days(cuadros, month = None, year = None):
     def _extract_days(cuadros):
@@ -256,6 +296,10 @@ def concatenate_dataframes(df_list, limit = 3):
 
 def main():
     cuadros = Extraer_Cuadros('Himnos 2025 marzo.xlsx')
+    add_titles_stranges(cuadros)
+
+    sys.exit(0)
+
     result = correction_days(cuadros)
     cuadros_new = filter_tables_day(cuadros, result)
     df_master = concatenate_dataframes(cuadros_new, limit=3)

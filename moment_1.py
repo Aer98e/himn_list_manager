@@ -8,7 +8,7 @@ from recicle import Management_Text as Text
 from recicle import Management_SQLite as M_SQ
 import numpy as np
 import datetime
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
 from os import system
 import re
 
@@ -62,7 +62,7 @@ def Extraer_Cuadros(file, identifier='R'):
 
     return cuadros
 
-def extract_table_titles(cuadro:pd.DataFrame, ind_column:int, norm = True):
+def extract_table_titles(cuadro:pd.DataFrame, ind_column:int, norm = False):
     """
     Extracts and optionally normalizes titles from a specified column in a DataFrame.
     Args:
@@ -114,55 +114,109 @@ def update_search_list(title_norm, norm_match):
             print(f'No se encontro :: {norm_match} en la base de datos.')
 
 def add_titles_stranges(cuadros):
+    """
+    add_titles_stranges(cuadros)
+    This function processes a list of hymn titles, compares them with an existing database, 
+    and updates the database with new titles or matches similar ones. It uses fuzzy matching 
+    to find the best matches for new titles and allows for manual confirmation of matches.
+    Parameters:
+        cuadros (list): A list of data structures containing hymn titles to be processed.
+    Returns:
+        list: A list of hymn titles that could not be matched or updated in the database.
+    Functions:
+        - extract_titles(): Extracts hymn titles from the input `cuadros` and returns them as a set.
+        - init_master(): Initializes the master list and set of normalized titles from the database.
+        - init_slave(master_set_norm): Extracts and normalizes titles from the input, 
+          and identifies new titles not present in the master set.
+        - generate_match_matrix(slave_util, master_list_norm): Generates a match matrix 
+          using fuzzy matching to compare new titles with the master list.
+        - find_best_match(match_matrix, master_list_norm): Finds the best matches for each 
+          new title based on the match matrix.
+        - update_database(best_matches, index, slave_list, not_find): Updates the database 
+          with the best matches or prompts the user for manual confirmation if no strong match is found.
+    Notes:
+        - The function uses fuzzy matching with a score cutoff of 60 to identify potential matches.
+        - Titles with a match score of 85 or higher are automatically updated in the database.
+        - For lower scores, the user is prompted to confirm if the titles are the same.
+        - Titles that cannot be matched or confirmed are added to the `not_find` list.
+    """
+    def extract_titles():
+        TITLE_COLUMN = 1
+        slave_set = set()
+        for cuadro in cuadros:
+            titles = extract_table_titles(cuadro, TITLE_COLUMN, norm=False)
+            slave_set.update(titles)
+        
+        return slave_set
 
-    master_list_NORM = M_SQ.Buscar_Columna(R_BUSQUEDA, 'Indice_busqueda', 'titulo_norm')
-    master_set = {title for title in master_list_NORM}
+    def init_master():
+        master_list_norm = M_SQ.Buscar_Columna(R_BUSQUEDA, 'Indice_busqueda', 'titulo_norm')
+        master_set_norm = {title for title in master_list_norm}
+        master_list_norm = list(master_set_norm)
 
-    for cuadro in cuadros:
-        slaves_list = extract_table_titles(cuadro, 1, norm=False)
-        slave_cache={Text.limpiar_texto1(title): title for title in slaves_list}
+        return master_list_norm, master_set_norm
+    
+    def init_slave(master_set_norm):
+        slave_set = extract_titles()
+        slave_dict = {Text.limpiar_texto1(title): title for title in slave_set}
+        slave_util = set(slave_dict.keys()) - master_set_norm
+        if not slave_util:
+            print('No hay himnos nuevos')
+            return None, None
+        slave_list = [slave_dict[title] for title in slave_util]
+        return slave_list, slave_util
+    
+    def generate_match_matrix(slave_util, master_list_norm):
+        match_matrix = process.cdist(slave_util, master_list_norm, scorer = fuzz.partial_ratio, score_cutoff = 60)
+        return match_matrix
 
-        for slave_title in slave_cache:
-            if slave_title in master_set:
-                continue
-                
-            else:
-                find = False
-                print('----------------------------------')
-                print(f'Buscando "{slave_cache[slave_title]}" ...')
-                print('----------------------------------')
+    def find_best_match(match_matrix, master_list_norm):
+        best_matches = []
+        for i, row in enumerate(match_matrix):
+            best_index = np.argsort(row)[::-1][:5]
+            best_matches.append([(master_list_norm[j], row[j]) for j in best_index])
+        return best_matches
+    
+    def update_database(best_matches, title_slave, title_slave_norm, not_find):
+        RATIO = 1
+        TITLE = 0
+        find = False
+        for i, match_a in enumerate(best_matches):
+            if match_a[RATIO] >= 85:
+                update_search_list(title_slave_norm, match_a[TITLE])
+                break
+            
+            possible_match = find_simil(match_a[TITLE])
+            print('----------------------------------')
+            print("Son el mismo himno?")
+            print(f'--{title_slave}')
+            print(f'--{possible_match}')	
+            ans = input('_________________(S/N): ').strip()
+            print("")
 
-                best_matches = []
+            if ans.lower() in rec.ans_y:
+                update_search_list(title_slave_norm, match_a[TITLE])
+            
+            elif not find and i == len(best_matches)-1:
+                not_find.append(title_slave)
+            
 
-                for master_title in master_set:
-                    sim_ratio = fuzz.ratio(master_title, slave_title, score_cutoff=60)
-                    if sim_ratio > 0:
-                        best_matches.append((sim_ratio, master_title))
+    master_list_norm, master_set_norm = init_master()
+    slave_list, slave_util = init_slave(master_set_norm)
 
-                if not best_matches:
-                    print('No hay similitudes mayores a 60, reescirbir el himno')
-                    print('================================================================================')
-                    continue
+    if slave_util is None:
+        return
+    
+    match_matrix = generate_match_matrix(slave_util, master_list_norm)
 
-                similares_ord = sorted(best_matches, key=lambda x: x[0], reverse=True)
-                for match in similares_ord:
-                    if match[0] < 85:
-                        possible_match = find_simil(match[1])
-                        print("Son el mismo himno?")
-                        print(f'--{slave_cache[slave_title]}')
-                        print(f'--{possible_match}')	
-                        ans = input('_________________(S/N): ').strip()
-                        print("") #Solo un salto de linea
-                        if ans.lower() not in rec.ans_y:
-                            continue
-                    find = True
-                    update_search_list(slave_title, match[1])
-                    break
-
-                if not find:    
-                    print(f'No se encontraron similares para {slave_cache[slave_title]}')
-                    print('================================================================================')
-
+    best_matches_row = find_best_match(match_matrix, master_list_norm)
+    
+    slave_list_norm = list(slave_util)
+    not_find = []
+    for i, best_matches in enumerate(best_matches_row):
+        update_database(best_matches, slave_list[i], slave_list_norm[i], not_find)
+    
+    return not_find
 
 def correction_days(cuadros, month = None, year = None):
     def _extract_days(cuadros):
@@ -296,17 +350,18 @@ def concatenate_dataframes(df_list, limit = 3):
 
 def main():
     cuadros = Extraer_Cuadros('Himnos 2025 marzo.xlsx')
-    add_titles_stranges(cuadros)
+    no_find = add_titles_stranges(cuadros)
+    if no_find:
+        print('No se encontraron los siguientes himnos:')
+        print(no_find)
 
-    sys.exit(0)
+    # result = correction_days(cuadros)
+    # cuadros_new = filter_tables_day(cuadros, result)
+    # df_master = concatenate_dataframes(cuadros_new, limit=3)
 
-    result = correction_days(cuadros)
-    cuadros_new = filter_tables_day(cuadros, result)
-    df_master = concatenate_dataframes(cuadros_new, limit=3)
+    # df_master = df_master.fillna("-")
 
-    df_master = df_master.fillna("-")
-
-    print(df_master)
+    # print(df_master)
 
     
     

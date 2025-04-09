@@ -1,11 +1,15 @@
+"""
+Este archivo contiene la version 2.0, esta lista para comenzar la segunda face, y tambien necesita separarla por modulos.
+"""
+
 import pandas as pd
 import Internal
 import sys
-import recicle as rec
+import moment_2 as rec
 import sqlite3
 from  difflib import SequenceMatcher
 from recicle import Management_Text as Text
-from recicle import Management_SQLite as M_SQ
+from moment_2 import Management_SQLite as M_SQ
 import numpy as np
 import datetime
 from rapidfuzz import fuzz, process

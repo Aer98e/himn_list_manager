@@ -1,3 +1,8 @@
+"""
+Este archivo es parte la version 1.0, se encargaba de la lectura de archivos binarios para guardar el registro frecuencia de usod e himnos
+Actualmente está en deshuso ya que en el archivo recicle.py tengo un gestor de datos binarios más práctico.
+"""
+
 import pickle
 import shutil
 import os

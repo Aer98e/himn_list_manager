@@ -1,3 +1,7 @@
+"""
+Este archivo es aprte de la versión 1.0, cuenta con todas las funciones que requería el trabajo. Aun tiene funciones que no estan adaptadas a las verisión 2.0
+"""
+
 import pandas as pd
 import os
 import Internal

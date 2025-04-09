@@ -3,17 +3,14 @@ Este archivo contiene la version 2.0, esta lista para comenzar la segunda face, 
 """
 
 import pandas as pd
-import Internal
 import sys
-import moment_2 as rec
 import sqlite3
-from  difflib import SequenceMatcher
+import recicle as rec
 from recicle import Management_Text as Text
-from moment_2 import Management_SQLite as M_SQ
+from recicle import Management_SQLite as M_SQ
 import numpy as np
 import datetime
 from rapidfuzz import fuzz, process
-from os import system
 import re
 
 R_GENERAL = 'Registro_General_Himnos_2.db'

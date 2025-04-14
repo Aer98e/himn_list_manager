@@ -219,94 +219,107 @@ def add_titles_stranges(cuadros):
     
     return not_find
 
-def correction_days(cuadros, month = None, year = None):
-    def _extract_days(cuadros):
+def get_correct_days(cuadros, month = None, year = None):
+
+    ROW_DATE = 0
+    COLUMN_DATE = 0
+    WEEKEN = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']
+    def extract_days(cuadros):
         days = []
         for cuadro in cuadros:
-            day = cuadro.iat[0, 0]
+            day = cuadro.iat[ROW_DATE, COLUMN_DATE]
             day = str(day)
             num = re.search(r'\d+', day)
             if num is not None:
                 days.append(int(num[0]))
             else:
-                print('Un cuadro no tiene fecha.')
+                raise ValueError(f'No se pudo extraer el día de la cadena: {day}')
         return days
 
+    def get_text_day(date:datetime.date):
+        day = date.day
+        week_num = date.weekday()
+        return f'{WEEKEN[week_num]} {day:02}'
+
     dates = []
-
-    weeken=['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']
+    # Obtener fecha actual
     today = datetime.date.today()
-    
-
     year = today.year if year is None else year
     month = today.month if month is None else month
-    print(f'año:{year}, mes {month}')
+    # print(f'año:{year}, mes {month}')
 
-    day_list = _extract_days(cuadros)
+    day_list = extract_days(cuadros)
     afternoon = False
 
     for i, day in enumerate(day_list):
         table_date = datetime.date(year, month, day)
         if table_date < today:#El igual permitira trabajar ese mismo dia o no.
             dates.append(None)
-        else:
-            day_ind = table_date.weekday()
-            temp_date = f'{weeken[day_ind]} {day:02}'
+            continue
+        
+        text_date = get_text_day(table_date)
 
-            if afternoon:
-                dates.append(f'{temp_date} T')
-                afternoon = False
-            
-            elif i < len(day_list)-1:
-                if day == day_list[i+1]:
-                    day == day_list[i+1]
-                    dates.append(f'{temp_date} M')
-                    afternoon = True
-                    continue
-                dates.append(temp_date)
-            
-            else:
-                dates.append(temp_date)
+        if afternoon:
+            text_date += ' T'
+            afternoon = False
+        
+        elif i < len(day_list)-1 and day == day_list[i+1]:  
+            text_date += ' M'
+            afternoon = True
+        
+        dates.append(text_date)
     return dates
     
-def filter_tables_day(cuadros, corrector):
-    cuadros_new=[]
+def filter_tables_day(cuadros, new_dates):
+    """Crea una lista de dataframes(cuadros de himnos), usando la fecha para filtrar cuadros pasados.
+    Arg:
+        cuadros: Lista de dataframes(cuadros de himnos).
+        new_dates: Lista de fechas filtradas. 
+    Returns:
+        new_cuadros: Lista de dataframes(cuadros de himnos) filtrados por fecha.
+    
+    Se debe tener a consideración que new_dates, debe ser filtrado con la función
+    get_correct_days, y que está pensado exclusivamente para cuadros de un tipo.
+    """
+    ROW_DATE = 0
+    COLUMN_DATE = 0
+    new_cuadros = []
     for i in range(len(cuadros)):
-        if corrector[i] is None:
+        if new_dates[i] is None:
             continue
-        cuadros[i].iat[0, 0] = corrector[i]
-        cuadros_new.append(cuadros[i].copy())
-    return cuadros_new
+        cuadros[i].iat[ROW_DATE, COLUMN_DATE] = new_dates[i]
+        new_cuadros.append(cuadros[i].copy())
+    return new_cuadros
 
 def concatenate_dataframes(df_list, limit = 3):
     def _add_empty_columns(df_list, limit=3):
         """
-        Agrupa DataFrames en listas y añade columnas vacías según un límite.
+        Agrupa DataFrames en listas, cada una sera una fila, y añade columnas vacías según un límite.
+        Esta funcion aun mantiene los dataframes en una lista, sin concatenarlos.
 
         Args:
             df_list (list): Lista de DataFrames.
             limit (int): Número máximo de DataFrames por grupo.
 
         Returns:
-            list: Lista de listas de DataFrames agrupados.
+            list: Lista de filas de DataFrames agrupados.
         """
         current_group = []
         grouped_dataframes = []
-        group_counter = 0
+        limit_counter = 0
 
         for i, df in enumerate(df_list):
-            df = df.copy()
-            df.reset_index(drop=True, inplace=True)  # Reinicia el índice del DataFrame
-             # Copia el DataFrame original para evitar modificarlo directamente
-            group_counter+=1
+            df = df.copy()      # Copia el DataFrame original para evitar modificarlo directamente
+            df.reset_index(drop=True, inplace=True)     # Reinicia el índice del DataFrame
+            group_counter += 1
 
             if i < len(df_list)-1:
 
-                if group_counter < limit:
+                if limit_counter < limit:
                     df['empty'] = None
                 
                 else:
-                    group_counter = 0
+                    limit_counter = 0
                     current_group.append(df)
                     grouped_dataframes.append(current_group)
                     current_group = []
@@ -320,14 +333,14 @@ def concatenate_dataframes(df_list, limit = 3):
         
         return grouped_dataframes
 
-    def _concatenate_column(pack_row):
-        rows_list = []
+    def _concatenate_column(row_packet_list):
+        row_list = []
 
-        for row in pack_row:
-            result = pd.concat(row, axis=1, ignore_index=True)  # Apila las columnas
-            rows_list.append(result)
+        for row_pack in row_packet_list:
+            result = pd.concat(row_pack, axis=1, ignore_index=True)  # Apila las columnas formando una fila
+            row_list.append(result)
 
-        return rows_list
+        return row_list
 
     def _concatenate_row(rows_list):
         empty_row = pd.DataFrame({col:[None] for col in rows_list[0].columns})  # Crea una fila vacía con las mismas columnas que el primer DataFrame
@@ -340,21 +353,22 @@ def concatenate_dataframes(df_list, limit = 3):
         result = pd.concat(with_empty_row, ignore_index=True)  # Apila las filas
         return result
 
-    pack_rows = _add_empty_columns(df_list, limit)
-    rows_list = _concatenate_column(pack_rows)
-    # for row in rows_list:
-    #     print(row)
-    #     print('----------------------------------')
+    rows_pack = _add_empty_columns(df_list, limit)
+    rows_list = _concatenate_column(rows_pack)
     df_master = _concatenate_row(rows_list)
     return df_master
 
 
 def main():
     cuadros = Extraer_Cuadros('Himnos 2025 marzo.xlsx')
-    no_find = add_titles_stranges(cuadros)
+    new_dates = get_correct_days(cuadros)
+    new_cuadros = filter_tables_day(cuadros, new_dates)
+    
+    no_find = add_titles_stranges(new_cuadros)
     if no_find:
         print('No se encontraron los siguientes himnos:')
         print(no_find)
+    
 
     # result = correction_days(cuadros)
     # cuadros_new = filter_tables_day(cuadros, result)

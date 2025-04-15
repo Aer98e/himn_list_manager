@@ -222,9 +222,8 @@ def add_titles_stranges(cuadros):
     return not_find
 
 def get_correct_days(cuadros, month = None, year = None):
-
     ROW_DATE = 0
-    COLUMN_DATE = 0
+    COLUMN_DATE = 1
     WEEKEN = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']
     def extract_days(cuadros):
         days = []
@@ -235,7 +234,8 @@ def get_correct_days(cuadros, month = None, year = None):
             if num is not None:
                 days.append(int(num[0]))
             else:
-                raise ValueError(f'No se pudo extraer el día de la cadena: {day}')
+                print(f'No se pudo extraer el día de la cadena: {day}')
+                # raise ValueError()
         return days
 
     def get_text_day(date:datetime.date):
@@ -284,7 +284,7 @@ def filter_tables_day(cuadros, new_dates):
     get_correct_days, y que está pensado exclusivamente para cuadros de un tipo.
     """
     ROW_DATE = 0
-    COLUMN_DATE = 0
+    COLUMN_DATE = 1
     new_cuadros = []
     for i in range(len(cuadros)):
         if new_dates[i] is None:
@@ -313,7 +313,7 @@ def concatenate_dataframes(df_list, limit = 3):
         for i, df in enumerate(df_list):
             df = df.copy()      # Copia el DataFrame original para evitar modificarlo directamente
             df.reset_index(drop=True, inplace=True)     # Reinicia el índice del DataFrame
-            group_counter += 1
+            limit_counter += 1
 
             if i < len(df_list)-1:
 
@@ -410,34 +410,20 @@ def generate_news_df(cuadros):
                 raise ValueError(f'No se encontró el himno: {title}')
         new_df_list.append(new_df)
 
+    return new_df_list
 
 def main():
-    cuadros = Extraer_Cuadros('Himnos 2025 marzo.xlsx')
-    new_dates = get_correct_days(cuadros)
-    new_cuadros = filter_tables_day(cuadros, new_dates)
-    
-    no_find = add_titles_stranges(new_cuadros)
+    cuadros = Extraer_Cuadros('Himnos 2025 Abril.xlsx')
+    no_find = add_titles_stranges(cuadros)
     if no_find:
         print('No se encontraron los siguientes himnos:')
         print(no_find)
+    new_dates = get_correct_days(cuadros)
+    filter_cuadros = filter_tables_day(cuadros, new_dates)
+    new_cuadros = generate_news_df(filter_cuadros)
     
-
-    # result = correction_days(cuadros)
-    # cuadros_new = filter_tables_day(cuadros, result)
-    # df_master = concatenate_dataframes(cuadros_new, limit=3)
-
-    # df_master = df_master.fillna("-")
-
-    # print(df_master)
-
-    
-    
-
-
-    
-
-
-
+    df_master = concatenate_dataframes(new_cuadros, limit=3)
+    df_master.to_excel('pruebas_2.xlsx', index=False, header=False)
 
 if __name__ == '__main__':
     main()

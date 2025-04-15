@@ -63,7 +63,7 @@ def Extraer_Cuadros(file, identifier='R'):
 
     return cuadros
 
-def extract_table_titles(cuadro:pd.DataFrame, ind_column:int, norm = False):
+def extract_table_titles(cuadro:pd.DataFrame, ind_column:int, norm = False, complete=False):
     """
     Extracts and optionally normalizes titles from a specified column in a DataFrame.
     Args:
@@ -76,8 +76,10 @@ def extract_table_titles(cuadro:pd.DataFrame, ind_column:int, norm = False):
                 or an list if `norm` is False.
     """
     resultados=[]
+
+    num_row = 0 if complete else 1
     
-    titles = cuadro.iloc[1:, ind_column].to_list()
+    titles = cuadro.iloc[num_row:, ind_column].to_list()
 
     
     if norm:
@@ -347,6 +349,56 @@ def concatenate_dataframes(df_list, limit = 3):
     #     print('----------------------------------')
     df_master = _concatenate_row(rows_list)
     return df_master
+
+def generate_news_df(cuadros):
+    new_df_list=[]
+
+    def generate_df(date):
+        columns_text=[['', date, 'B & P', 'N']]
+        new_df = pd.DataFrame(columns_text)
+        return new_df
+    
+    def add_data(df, data):
+        index = len(df)
+        new_row_content = [index]
+        for dat in data:
+            if dat is not None:
+                new_row_content.append(dat)
+            else:
+                new_row_content.append('-')
+        df.loc[index] = new_row_content
+
+    def extract_data_db(title):
+        title_norm = Text.limpiar_texto1(title)
+        with sqlite3.connect(R_BUSQUEDA) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id_himno FROM Indice_busqueda WHERE titulo_norm = ?', (title_norm,))
+            result = cursor.fetchone()
+            
+            if result:
+                id_himno = result[0]
+                cursor.execute('''
+                SELECT titulo, numH_uso, numH_nuevo
+                FROM Himnos
+                WHERE id = ?
+                ''', (id_himno,))
+                result = cursor.fetchone()
+                return result
+            else:
+                print(f'No se encontró el himno: {title}')
+                return None
+
+    for cuadro in cuadros:
+        titles_cuadro = extract_table_titles(cuadro, 1, complete=True)
+        new_df = generate_df(titles_cuadro[0])
+
+        for title in titles_cuadro[1:]:
+            data_curr = extract_data_db(title)
+            if data_curr:
+                add_data(new_df, data_curr)
+            else:
+                raise ValueError(f'No se encontró el himno: {title}')
+        new_df_list.append(new_df)
 
 
 def main():

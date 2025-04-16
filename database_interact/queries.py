@@ -25,7 +25,7 @@ def find_data(title_norm, queries:list):
     if not isinstance(queries, list):
         raise ValueError('El argumento queries debe ser de tipo list')
     
-    querie = f"Himnos.{queries[0]}, " + ", ".join([f"Himnos.{que}" for que in queries[1:]])
+    querie = ", ".join([f"Himnos.{que}" for que in queries])
 
     with sqlite3.connect(R_BUSQUEDA()) as conn:
         cursor = conn.cursor()

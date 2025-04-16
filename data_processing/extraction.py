@@ -64,17 +64,16 @@ def extract_table_titles(cuadro:pd.DataFrame, ind_column:int, norm = False, comp
     num_row = 0 if complete else 1
     
     titles = cuadro.iloc[num_row:, ind_column].to_list()
-
     
     if norm:
         # data_norm = [(Text.limpiar_texto1(title), title) for title in titles]
         data_norm = [limpiar_texto1(title) for title in titles]
-        resultados = data_norm
-
+        if complete:
+            data_norm[0] = titles[0]
+        return data_norm
     else:
         return titles
 
-    return resultados
 
 def main():
     pass

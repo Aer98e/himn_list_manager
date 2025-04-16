@@ -2,7 +2,10 @@ import sqlite3
 from .file_names import R_BUSQUEDA
 from utils.helpers import limpiar_texto1
 
-def find_simil(simil):
+def find_title(title_norm):
+    '''
+    Esta funcion recibe un titulo normalizado para buscar el titulo al que hace referencia dentro de la base de datos() puede haber ma de un titulo normalizado referenciando a un solo titulo.
+    '''
     with sqlite3.connect(R_BUSQUEDA()) as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -11,8 +14,31 @@ def find_simil(simil):
             FROM Himnos
             JOIN Indice_busqueda ON Himnos.id=Indice_busqueda.id_himno
             WHERE Indice_busqueda.titulo_norm = ?
-            ''',(simil,))
+            ''',(title_norm,))
         res = cursor.fetchone()
+    return res[0]
+
+def find_data(title_norm, queries:list):
+    '''
+    Permite busqueda general de alguna columna  basandose en un titulo normalizado
+    '''
+    if not isinstance(queries, list):
+        raise ValueError('El argumento queries debe ser de tipo list')
+    
+    querie = f"Himnos.{queries[0]}, " + ", ".join([f"Himnos.{que}" for que in queries[1:]])
+
+    with sqlite3.connect(R_BUSQUEDA()) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f'''
+            SELECT {querie}
+            FROM Himnos
+            JOIN Indice_busqueda ON Himnos.id=Indice_busqueda.id_himno
+            WHERE Indice_busqueda.titulo_norm = ?
+            ''',(title_norm,))
+        res = cursor.fetchone()
+    if len(queries)>1:
+        return res
     return res[0]
 
 def update_search_list(title_norm, norm_match):
@@ -65,6 +91,9 @@ def extract_data_db(title):
         else:
             print(f'No se encontró el himno: {title}')
             return None
+
+def update_frec_hymns(frecuences):
+    pass
 
 def main():
     pass

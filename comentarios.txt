@@ -1,1 +1,5 @@
 necesito que pueda organizar cuadros incluso si no se encuentran en orden.
+
+ordenar match titles, y cambiar la funcion buscar columna de queris a algo mas especifico, o en caso sea mas practico hacerlo mas sencillo de usar.
+
+la funcion get_Correct_dates, deberia corregir tambien los nombres de los cuadros ya antes de ahcer el filtrado(el codigo actual no lo permite)

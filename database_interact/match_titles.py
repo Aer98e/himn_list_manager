@@ -1,7 +1,7 @@
 from data_processing.extraction import extract_table_titles
 from utils.helpers import limpiar_texto1, ans_y
 from rapidfuzz import fuzz, process
-from .queries import update_search_list, find_simil, Buscar_Columna
+from .queries import update_search_list, find_title, Buscar_Columna
 from .file_names import R_BUSQUEDA
 import numpy as np
 
@@ -78,7 +78,7 @@ def add_titles_stranges(cuadros):
                 update_search_list(title_slave_norm, match_a[TITLE])
                 break
             
-            possible_match = find_simil(match_a[TITLE])
+            possible_match = find_title(match_a[TITLE])
             print('----------------------------------')
             print("Son el mismo himno?")
             print(f'--{title_slave}')

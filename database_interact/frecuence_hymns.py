@@ -1,6 +1,7 @@
 from .file_names import R_BUSQUEDA
 from .queries import find_title, find_data, load_frequencies, database_update
 from data_processing.extraction import extract_table_titles
+from utils.helpers import ans_y
 
 def generate_list_frequencies(data_tables_list):
     TITLE_COLUMN = 1
@@ -94,4 +95,8 @@ def update_frequency_hymns(new_freq):
     
     prev_freq = load_frequencies()
     data_update = update_frequencies(prev_freq)
-    database_update(data_update)
+    ans = input("Este proceso modificará la base de datos.\n ¿Deseas continuar?: ").strip()
+    if ans.lower() in ans_y:
+        database_update(data_update)
+    else:
+        print('No se completó la actualización de la base de datos.')

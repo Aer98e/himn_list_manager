@@ -1,8 +1,8 @@
 from .file_names import R_BUSQUEDA
-from .queries import find_title, find_data
+from .queries import find_title, find_data, load_frequencies, database_update
 from data_processing.extraction import extract_table_titles
 
-def generate_list_frecuences(data_tables_list):
+def generate_list_frequencies(data_tables_list):
     TITLE_COLUMN = 1
     ID_IDX = 0
     TITLE_IDX = 1
@@ -69,3 +69,29 @@ def show_duplications(frequencies):
     # return confirmation, duplications
     return confirmation
 
+def update_frequency_hymns(new_freq):
+    def update_frequencies(prev_freq):
+        ID_IDX = 0
+        FREQ_UTIL_IDX = 1
+        FREQ_REAL_IDX = 2 
+
+        data_update = []
+
+        for freq_hymn in prev_freq:
+            id_hymn = freq_hymn[ID_IDX]
+            freq_util = freq_hymn[FREQ_UTIL_IDX]
+            freq_real = freq_hymn[FREQ_REAL_IDX]
+
+            if id_hymn in new_freq:
+                freq_util = 1 if freq_util < 0 else freq_util+1
+                freq_real += len(new_freq[id_hymn]['dates'])
+
+            else:
+                freq_util = 0 if freq_util > 0 else freq_util-1
+
+            data_update.append((freq_util, freq_real, id_hymn))
+        return data_update
+    
+    prev_freq = load_frequencies()
+    data_update = update_frequencies(prev_freq)
+    database_update(data_update)

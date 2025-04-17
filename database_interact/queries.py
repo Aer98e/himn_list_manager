@@ -92,8 +92,26 @@ def extract_data_db(title):
             print(f'No se encontró el himno: {title}')
             return None
 
-def update_frec_hymns(frecuences):
-    pass
+def load_frequencies():
+    with sqlite3.connect(R_BUSQUEDA()) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+        SELECT id_himno, frec_util, frec_real
+        FROM Frecuencias
+        WHERE seguimiento = 1
+        ''')
+        result = cursor.fetchall()
+    return result
+
+def database_update(data_update):
+    with sqlite3.connect(R_BUSQUEDA()) as conn:
+        cursor = conn.cursor()
+        cursor.executemany('''
+            UPDATE Frecuencias
+            SET frec_util = ?, frec_real = ?
+            WHERE id_himno = ?
+        ''', data_update)
+        conn.commit() 
 
 def main():
     pass

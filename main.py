@@ -2,7 +2,7 @@ from data_processing.extraction import Extraer_Cuadros
 from database_interact.match_titles import add_titles_stranges
 from data_processing.scheduler import get_correct_days, filter_tables_day
 from data_processing.formatting import generate_news_df, concatenate_dataframes
-from database_interact.frecuence_hymns import generate_list_frecuences, show_duplications
+from database_interact.frecuence_hymns import generate_list_frequencies, show_duplications, update_frequency_hymns
 import sys
 
 def main():
@@ -12,8 +12,9 @@ def main():
         print('No se encontraron los siguientes himnos:')
         print(no_find)
     
-    frequencies = generate_list_frecuences(cuadros)
-    show_duplications(frequencies)
+    frequencies = generate_list_frequencies(cuadros)
+    # show_duplications(frequencies)
+    update_frequency_hymns(frequencies)
 
     sys.exit()
     new_dates = get_correct_days(cuadros)

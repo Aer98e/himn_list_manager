@@ -1,5 +1,4 @@
-from .file_names import R_BUSQUEDA
-from .queries import find_title, find_data, load_frequencies, database_update
+from .queries import find_data, load_frequencies, database_update, find_title_id
 from data_processing.extraction import extract_table_titles
 from utils.helpers import ans_y
 
@@ -38,9 +37,13 @@ La estructura de frecuences es:
     }
 '''
 
-def show_duplications(frequencies):
+def show_duplications(frequencies: dict, show: bool=True):
     """
     Muestra duplicaciones y devuelve una lista con los datos encontrados.
+
+    Args:
+    frequiencies (dict): Es un diccionario que usa como keys indices unicos de una base de datos, y como valores guarda el titulo(extraido de la base de datos) y las fechas(segun la hoja revisada) en las que se usa el himno.
+    show (bool): Si está activo mostrará mensajes en consola hacerca de los resultados.
     """
     
     if not isinstance(frequencies, dict):
@@ -61,17 +64,27 @@ def show_duplications(frequencies):
                 "times_used": times,
                 "dates": data['dates']
             })
-            
-            print(f"El himno '{title}' ha sido usado {times} veces:")
-            for date in data['dates']:
-                print(f"   - {date}")
-            print("_______________________________________________________")
+            if show:
+                print(f"El himno '{title}' ha sido usado {times} veces:")
+                for date in data['dates']:
+                    print(f"   - {date}")
+                print("_______________________________________________________")
     
     # return confirmation, duplications
     return confirmation
 
-def update_frequency_hymns(new_freq):
-    def update_frequencies(prev_freq):
+def update_frequency_hymns(new_freq, automatic: bool = False):
+    '''
+    Actualiza una base de datos especifica segun los datos de frecuencia extraidos de la ultima hoja procesada.
+
+    Args:
+        new_freq (dict): Las frecuencias que se añadiran a la base de datos
+        automatic (bool): Si está activo actualizará la base de datos sin realizar una consulta antes.
+
+    Notes:
+        Para asignar la frecuencia util solo se tiene en cuenta la ultima vez que fue usado el himno.
+    '''
+    def update_frequencies(prev_freq:list[tuple]):
         ID_IDX = 0
         FREQ_UTIL_IDX = 1
         FREQ_REAL_IDX = 2 
@@ -95,8 +108,84 @@ def update_frequency_hymns(new_freq):
     
     prev_freq = load_frequencies()
     data_update = update_frequencies(prev_freq)
-    ans = input("Este proceso modificará la base de datos.\n ¿Deseas continuar?: ").strip()
-    if ans.lower() in ans_y:
-        database_update(data_update)
-    else:
-        print('No se completó la actualización de la base de datos.')
+
+    if not automatic:
+        ans = input("Este proceso modificará la base de datos.\n ¿Deseas continuar?: ").strip()
+        if ans.lower() not in ans_y:
+            print('No se completó la actualización de la base de datos.')
+            return None
+    database_update(data_update)
+        
+def analysis_assistant(frequencies: dict):
+    if not isinstance(frequencies, dict):
+        raise TypeError('El parametro ingresado no es de tipo Dict.')
+    
+    def interface():
+        print("================== Registro de uso de Himnos ==================\n")
+        print("\t1) Himnos que ya han sido usados en almenos las 2 ultimas hojas.")
+        print("\t2) Himnos que no han sido usados en la ultima hoja.")
+        print("\t3) Himnos muy poco usados.")
+        print("\t4) Salir.")
+
+        ans = input('Ingrese el número de su opción: ').strip()
+        return ans
+    def show_results(results: list):
+        dividing:int = results[0][1]
+        print("===============================================================")
+        for i, res in enumerate(results):
+            if dividing!=res[1]:
+                print()
+                dividing=res[1]
+
+            print(f'{i+1}. {res[0]}({res[1]}).')
+        print("===============================================================")
+
+    prev_freq = load_frequencies()
+    dict_prev_freq = {dat[0]: {'freq_util':dat[1], 'freq_real':dat[2]} for dat in prev_freq}
+
+    id_hymns_repeated = [id for id in dict_prev_freq if id in frequencies]
+    repeated = list(filter(lambda id :dict_prev_freq[id]['freq_util'] > 1, id_hymns_repeated))
+    freq_repeat = [dict_prev_freq[id]['freq_util'] for id in repeated]
+
+    id_hymns_not_repeated = [id for id in dict_prev_freq if id not in frequencies]
+    no_repeated = list(filter(lambda id :dict_prev_freq[id]['freq_util'] < 1, id_hymns_not_repeated))
+    freq_no_repeat=[dict_prev_freq[id]['freq_util'] for id in no_repeated]
+
+    
+    while True:
+        ans=interface()
+        if ans == '1':
+            titles = find_title_id(repeated)
+            result=list(zip(titles, freq_repeat))
+            result.sort(key=lambda x:x[1], reverse=True)
+
+        elif ans == '2':
+            titles = find_title_id(no_repeated)
+            result=list(zip(titles, freq_no_repeat))
+            result.sort(key=lambda x:x[1])
+            
+        elif ans == '3':
+            print('Aun no implementada')
+            continue
+        elif ans == '4':
+            break
+
+        else:
+            print('__ ¡Error! __ Opcion invalida. Intente nuevamente.')
+            continue
+
+        show_results(result)
+        
+
+        ans_2 = input('\n\tDesea finalizar?: ').strip()
+        if ans_2.lower()  in ans_y:
+            break
+
+   
+
+    
+    
+        # -Mostrar que himnos estoy usando y ya he usado en las dos ultimas hojas/podriamos_
+        # tener prioridad en los himnos que se repiten mas de una vez en la hoja actual.
+        # -Mostrar que himnos no he usado desde la anterior vez.
+        # -Mostrar himnos por debajo del promedio(no usados).

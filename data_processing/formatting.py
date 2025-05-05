@@ -1,6 +1,9 @@
 import pandas as pd
-from .extraction import extract_table_titles
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill
+from .extraction import extract_table_titles, capture_change_idx
 from database_interact.queries import extract_data_db
+import os
 
 def concatenate_dataframes(df_list, limit = 3):
     def _add_empty_columns(df_list, limit=3):
@@ -96,10 +99,43 @@ def generate_news_df(cuadros):
             if data_curr:
                 add_data(new_df, data_curr)
             else:
-                raise ValueError(f'No se encontró el himno: {title}')
+                raise ValueError(f'No se encontró el himno: {title}, en la base de datos.')
         new_df_list.append(new_df)
 
     return new_df_list
+
+def formating(df_master:pd.DataFrame, num):
+    file = os.path.join('file_procces', f'final_file_{num}.xlsx')
+    idx = capture_change_idx(df_master)
+
+    df_master.to_excel(file, index=False, header=False)
+    wb = load_workbook(file)
+    ws = wb.active
+
+    style_new = Font(bold=True, color="2F75B5")
+    style_transpose = Font(bold=True, color="7030A0")
+    fill_red = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    fill_green = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
+
+    styles = {'new':style_new, 'transpose':style_transpose}
+    fills = {'red':fill_red, 'green':fill_green}
+
+    for key, style in styles.items():
+        for i, j in idx[key]:
+            ws.cell(row=i+1, column=j+1).font = style
+    for key, fill in fills.items():
+        for i, j in idx[key]:
+            ws.cell(row=i+1, column=j+1).fill = fill
+    wb.save(file)
+    print(f"Formato aplicado exitosamente en {file}.")
+
+    return df_master
+
+
+
+
+    
+
 
 def main():
     pass

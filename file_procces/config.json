@@ -1,0 +1,23 @@
+{   
+    "size_name":16,
+    "style_name":"Cambria",
+    "distance_name":45,
+
+    "header_size":12,
+    "general_size":11,
+
+    "cl_new":"2F75B5",
+    "cl_transpose":"7030A0",
+    "fill_red":"FFF2CC",
+    "fill_green":"C6E0B4",
+    "fill_sunday":"F4B084",
+    "fill_other_day":"A9D08E",
+    
+    "col_idx":3.06,
+    "col_title":31.62,
+    "col_numbers":4.08,
+    "col_space":4.8,
+    
+    "row_headers":18.36,
+    "row_general":16
+}

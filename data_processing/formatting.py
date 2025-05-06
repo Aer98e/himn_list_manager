@@ -4,6 +4,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 from .extraction import extract_table_titles, capture_change_idx
 from database_interact.queries import extract_data_db
+import json
 import os
 
 def concatenate_dataframes(df_list, limit = 3):
@@ -76,8 +77,9 @@ def concatenate_dataframes(df_list, limit = 3):
 def generate_news_df(cuadros):
     new_df_list=[]
 
-    def generate_df(date):
-        columns_text=[['', date, 'B & P', 'N']]
+    def generate_df(date:str):
+        date_sign=date+'::D'if 'DOMINGO' in date else date+'::O'
+        columns_text=[['', date_sign, 'O', 'N']]
         new_df = pd.DataFrame(columns_text)
         return new_df
     
@@ -105,41 +107,50 @@ def generate_news_df(cuadros):
 
     return new_df_list
 
-def formating(df_master:pd.DataFrame, num):
-    file = os.path.join('file_procces', f'final_file_{num}.xlsx')
+def load_config() ->dict:
+    file = os.path.join('file_procces', 'config.json')
+    with open(file, mode='r') as config:
+        conf = json.load(config)
+    return conf
+
+def formating(df_master:pd.DataFrame, num:int, title_page:str):
+    file = os.path.join('file_procces', f'{title_page}.xlsx')
     idx = capture_change_idx(df_master)
 
     df_master.to_excel(file, index=False, header=False)
     wb = load_workbook(file)
     ws = wb.active
 
-    style_new = Font(bold=True, color="2F75B5")
-    style_transpose = Font(bold=True, color="7030A0")
-    fill_red = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    fill_green = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
+    conf = load_config()
+
+    style_new = Font(bold=True, color=conf['cl_new'])
+    style_transpose = Font(bold=True, color=conf['cl_transpose'])
+    fill_red = PatternFill(start_color=conf['fill_red'], end_color=conf['fill_red'], fill_type="solid")
+    fill_green = PatternFill(start_color=conf['fill_green'], end_color=conf['fill_green'], fill_type="solid")
+    fill_sunday = PatternFill(start_color=conf['fill_sunday'], end_color=conf['fill_sunday'], fill_type="solid")
+    fill_other_day = PatternFill(start_color=conf['fill_other_day'], end_color=conf['fill_other_day'], fill_type="solid")
     alg_center = Alignment(horizontal = 'center')
 
-    general_size=Font(size=11)
-    size_12=Font(size=12)
+    general_size = Font(size=conf['general_size'])
+    header_size = conf['header_size']
 
     styles = {'new':style_new, 'transpose':style_transpose}
-    fills = {'red':fill_red, 'green':fill_green}
+    fills = {'red':fill_red, 'green':fill_green, 'sunday':fill_sunday, 'other_day':fill_other_day}
 
     for row_idx in range(1, ws.max_row+1):
         height = 0
         derivation = row_idx % 8
 
-
         if derivation in (0, 1):
-            height = 18.36
+            height = conf['row_headers']
 
             if derivation == 1:
                 for cell in ws[row_idx]:
-                    cell.font = size_12
+                    cell.font = Font(size=header_size, bold=True)
                     cell.alignment = alg_center
     
         elif derivation in (2, 3, 4, 5, 6, 7):
-            height = 16
+            height = conf['row_general']
 
             for cell in ws[row_idx]:
                 cell.font = general_size
@@ -152,36 +163,41 @@ def formating(df_master:pd.DataFrame, num):
         derivation = col_idx % 5
 
         if derivation == 1:
-            width = 3.06
+            width = conf['col_idx']
 
             for column in ws.iter_cols(min_col=col_idx, max_col=col_idx):
                 for cell in column:
-                    cell.font = size_12
                     cell.alignment = alg_center
         
         elif derivation == 2:
-            width = 31.62
+            width = conf['col_title']
         
         elif derivation in (3, 4):
-            width = 4.08
+            width = conf['col_numbers']
 
             for column in ws.iter_cols(min_col=col_idx, max_col=col_idx):
-                for cell in column:
-                    cell.font = size_12
+                for i, cell in enumerate(column,1):
+                    cell.font = Font(size=header_size, bold=cell.font.bold)
                     cell.alignment = alg_center
         
         elif derivation == 0:
-            width = 4.8
+            width = conf['col_space']
     
         ws.column_dimensions[letter].width = width
 
     for key, style in styles.items():
         for i, j in idx[key]:
-            ws.cell(row=i+1, column=j+1).font = style
+            ws.cell(row=i+1, column=j+1).font += style
 
     for key, fill in fills.items():
         for i, j in idx[key]:
             ws.cell(row=i+1, column=j+1).fill = fill
+
+    ws.insert_rows(1, amount=2)
+    ws.merge_cells(start_row=1, end_row=1, start_column=1, end_column=ws.max_column)
+    ws.cell(row=1, column=1, value=title_page).font=Font(name=conf['style_name'], bold=True, size=conf['size_name'])
+    ws.cell(row=1, column=1).alignment=Alignment(horizontal='center')
+    ws.row_dimensions[2].height = conf['distance_name']
 
     wb.save(file)
     print(f"Formato aplicado exitosamente en {file}.") 

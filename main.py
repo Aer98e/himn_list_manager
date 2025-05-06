@@ -34,7 +34,7 @@ def main():
 
     df_master = concatenate_dataframes(new_cuadros, limit=3)
 
-    formating(df_master, 5)
+    formating(df_master, 'Himnos Mayo')
     
 def test():
     print(6%5)

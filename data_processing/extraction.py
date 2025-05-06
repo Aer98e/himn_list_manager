@@ -95,7 +95,9 @@ def capture_change_idx(df_master:pd.DataFrame) -> dict[str, np.ndarray]:
     patterns={'red':'::R',
               'green':'::V',
               'new':'::N',
-              'transpose':'::U'}
+              'transpose':'::U',
+              'sunday':'::D',
+              'other_day':'::O'}
     
     matriz_np = df_master.copy().to_numpy(dtype=str)
 

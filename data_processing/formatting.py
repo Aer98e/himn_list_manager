@@ -1,6 +1,7 @@
 import pandas as pd
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
 from .extraction import extract_table_titles, capture_change_idx
 from database_interact.queries import extract_data_db
 import os
@@ -116,26 +117,74 @@ def formating(df_master:pd.DataFrame, num):
     style_transpose = Font(bold=True, color="7030A0")
     fill_red = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
     fill_green = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
+    alg_center = Alignment(horizontal = 'center')
+
+    general_size=Font(size=11)
+    size_12=Font(size=12)
 
     styles = {'new':style_new, 'transpose':style_transpose}
     fills = {'red':fill_red, 'green':fill_green}
 
+    for row_idx in range(1, ws.max_row+1):
+        height = 0
+        derivation = row_idx % 8
+
+
+        if derivation in (0, 1):
+            height = 18.36
+
+            if derivation == 1:
+                for cell in ws[row_idx]:
+                    cell.font = size_12
+                    cell.alignment = alg_center
+    
+        elif derivation in (2, 3, 4, 5, 6, 7):
+            height = 16
+
+            for cell in ws[row_idx]:
+                cell.font = general_size
+
+        ws.row_dimensions[row_idx].height = height
+        
+    for col_idx in range(1, ws.max_column+1):
+        width = 0
+        letter = get_column_letter(col_idx)
+        derivation = col_idx % 5
+
+        if derivation == 1:
+            width = 3.06
+
+            for column in ws.iter_cols(min_col=col_idx, max_col=col_idx):
+                for cell in column:
+                    cell.font = size_12
+                    cell.alignment = alg_center
+        
+        elif derivation == 2:
+            width = 31.62
+        
+        elif derivation in (3, 4):
+            width = 4.08
+
+            for column in ws.iter_cols(min_col=col_idx, max_col=col_idx):
+                for cell in column:
+                    cell.font = size_12
+                    cell.alignment = alg_center
+        
+        elif derivation == 0:
+            width = 4.8
+    
+        ws.column_dimensions[letter].width = width
+
     for key, style in styles.items():
         for i, j in idx[key]:
             ws.cell(row=i+1, column=j+1).font = style
+
     for key, fill in fills.items():
         for i, j in idx[key]:
             ws.cell(row=i+1, column=j+1).fill = fill
+
     wb.save(file)
-    print(f"Formato aplicado exitosamente en {file}.")
-
-    return df_master
-
-
-
-
-    
-
+    print(f"Formato aplicado exitosamente en {file}.") 
 
 def main():
     pass

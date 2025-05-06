@@ -13,11 +13,11 @@
     "fill_sunday":"F4B084",
     "fill_other_day":"A9D08E",
     
-    "col_idx":3.06,
-    "col_title":31.62,
-    "col_numbers":4.08,
-    "col_space":4.8,
+    "col_idx":3,
+    "col_title":32,
+    "col_numbers":4.5,
+    "col_space":4.6,
     
-    "row_headers":18.36,
+    "row_headers":18.5,
     "row_general":16
 }

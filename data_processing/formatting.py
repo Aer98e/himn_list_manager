@@ -113,7 +113,7 @@ def load_config() ->dict:
         conf = json.load(config)
     return conf
 
-def formating(df_master:pd.DataFrame, num:int, title_page:str):
+def formating(df_master:pd.DataFrame, title_page:str):
     file = os.path.join('file_procces', f'{title_page}.xlsx')
     idx = capture_change_idx(df_master)
 

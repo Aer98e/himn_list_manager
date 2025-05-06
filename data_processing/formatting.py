@@ -113,8 +113,8 @@ def load_config() ->dict:
         conf = json.load(config)
     return conf
 
-def formating(df_master:pd.DataFrame, num:int, title_page:str):
-    file = os.path.join('file_procces', f'{title_page}.xlsx')
+def formating(df_master:pd.DataFrame, title_page:str):
+    file = os.path.join('file_procces', 'moment.xlsx')
     idx = capture_change_idx(df_master)
 
     df_master.to_excel(file, index=False, header=False)
@@ -199,8 +199,8 @@ def formating(df_master:pd.DataFrame, num:int, title_page:str):
     ws.cell(row=1, column=1).alignment=Alignment(horizontal='center')
     ws.row_dimensions[2].height = conf['distance_name']
 
-    wb.save(file)
-    print(f"Formato aplicado exitosamente en {file}.") 
+    wb.save('moment.xlsx')
+    print(f"Formato aplicado exitosamente.") 
 
 def main():
     pass

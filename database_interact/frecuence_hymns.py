@@ -110,14 +110,17 @@ def update_frequency_hymns(new_freq, automatic: bool = False):
     data_update = update_frequencies(prev_freq)
 
     if not automatic:
-        ans = input("Este proceso modificará la base de datos.\n ¿Deseas continuar?: ").strip()
+        ans = input("Este proceso registrará los himnos de la hoja actual en la base de datos\n",
+                    "esto se reflejara en próximas ejecuciones.\n",
+                    "Solo realizar con una hoja que no tendra mas modificaciónes.\n\n",
+                    "¿Deseas continuar?: ").strip()
         if ans.lower() not in ans_y:
             print('No se completó la actualización de la base de datos.')
             return None
     database_update(data_update)
         
-def analysis_assistant(frequencies: dict):
-    if not isinstance(frequencies, dict):
+def analysis_assistant(ids_master: set):
+    if not isinstance(ids_master, dict):
         raise TypeError('El parametro ingresado no es de tipo Dict.')
     
     def interface():
@@ -140,38 +143,42 @@ def analysis_assistant(frequencies: dict):
             print(f'{i+1}. {res[0]}({res[1]}).')
         print("===============================================================")
 
+    #   fq = frecucencia || ut = util || rl = real
     prev_freq = load_frequencies()
     dict_prev_freq = {dat[0]: {'freq_util':dat[1], 'freq_real':dat[2]} for dat in prev_freq}
+    fq_rl = [(id, freq['freq_real']) for id, freq in dict_prev_freq.items() if freq['freq_real']]
+    fq_rl.sort(key=lambda x:x[1], reverse=True)
 
-    id_hymns_repeated = [id for id in dict_prev_freq if id in frequencies]
-    repeated = list(filter(lambda id :dict_prev_freq[id]['freq_util'] > 1, id_hymns_repeated))
-    freq_repeat = [dict_prev_freq[id]['freq_util'] for id in repeated]
+    id_sheet = [id for id in dict_prev_freq if id in ids_master]
+    id_used = list(filter(lambda id :dict_prev_freq[id]['freq_util'] > 1, id_sheet))
+    fq_ut_used = [dict_prev_freq[id]['freq_util'] for id in id_used]
 
-    id_hymns_not_repeated = [id for id in dict_prev_freq if id not in frequencies]
-    no_repeated = list(filter(lambda id :dict_prev_freq[id]['freq_util'] < 1, id_hymns_not_repeated))
-    freq_no_repeat=[dict_prev_freq[id]['freq_util'] for id in no_repeated]
+    id_no_sheet = [id for id in dict_prev_freq if id not in ids_master]
+    id_no_used = list(filter(lambda id :dict_prev_freq[id]['freq_util'] < 1, id_no_sheet))
+    fq_ut_no_used = [dict_prev_freq[id]['freq_util'] for id in id_no_used]
 
     
     while True:
-        ans=interface()
+        ans = interface()
         if ans == '1':
-            titles = find_title_id(repeated)
-            result=list(zip(titles, freq_repeat))
+            titles = find_title_id(id_used)
+            result = list(zip(titles, fq_ut_used))
             result.sort(key=lambda x:x[1], reverse=True)
 
         elif ans == '2':
-            titles = find_title_id(no_repeated)
-            result=list(zip(titles, freq_no_repeat))
+            titles = find_title_id(id_no_used)
+            result = list(zip(titles, fq_ut_no_used))
             result.sort(key=lambda x:x[1])
             
         elif ans == '3':
-            print('Aun no implementada')
-            continue
+            limit=20
+            titles == find_title_id([dat[0] for dat in fq_rl[:limit]])
+            result = list(zip(titles, fq_rl[:limit]))
         elif ans == '4':
             break
 
         else:
-            print('__ ¡Error! __ Opcion invalida. Intente nuevamente.')
+            print('=_=_= ¡Error! =_=_= Opción Invalida =_=_= Intente Nuevamente =_=_=')
             continue
 
         show_results(result)

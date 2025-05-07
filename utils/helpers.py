@@ -7,6 +7,11 @@ import json
 ans_y = ('y', 's', '1', 'yes', 'si')
 
 def limpiar_texto1(texto:str):
+    if not isinstance(texto, str):
+        try:
+            texto=str(texto)
+        except:
+            raise TypeError('El tipo de dato a procesar debe ser texto.')
     texto = texto.lower()
     texto = re.sub(r'[^\w\s]', '', texto)
     texto = re.sub(r'\s+', '', texto)

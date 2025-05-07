@@ -1,6 +1,7 @@
 from .queries import find_data, load_frequencies, database_update, find_title_id
 from data_processing.extraction import extract_table_titles
 from utils.helpers import ans_y
+from interact_user.test import show_duplications_UI
 
 def generate_list_frequencies(data_tables_list):
     TITLE_COLUMN = 1
@@ -69,7 +70,7 @@ def show_duplications(frequencies: dict, show: bool=True):
                 for date in data['dates']:
                     print(f"   - {date}")
                 print("_______________________________________________________")
-    
+    show_duplications_UI(duplications)
     # return confirmation, duplications
     return confirmation
 
@@ -110,18 +111,15 @@ def update_frequency_hymns(new_freq, automatic: bool = False):
     data_update = update_frequencies(prev_freq)
 
     if not automatic:
-        ans = input("Este proceso registrará los himnos de la hoja actual en la base de datos\n",
-                    "esto se reflejara en próximas ejecuciones.\n",
-                    "Solo realizar con una hoja que no tendra mas modificaciónes.\n\n",
-                    "¿Deseas continuar?: ").strip()
+        ans = input("Este proceso registrará los himnos de la hoja actual en la base de datos\nesto se reflejara en próximas ejecuciones.\nSolo realizar con una hoja que no tendra mas modificaciónes.\n\n¿Deseas continuar?: ").strip()
         if ans.lower() not in ans_y:
             print('No se completó la actualización de la base de datos.')
             return None
     database_update(data_update)
         
 def analysis_assistant(ids_master: set):
-    if not isinstance(ids_master, dict):
-        raise TypeError('El parametro ingresado no es de tipo Dict.')
+    if not isinstance(ids_master, set):
+        raise TypeError('El parametro ingresado no es de tipo Set.')
     
     def interface():
         print("================== Registro de uso de Himnos ==================\n")

@@ -4,8 +4,10 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 from .extraction import extract_table_titles, capture_change_idx
 from database_interact.queries import extract_data_db
+from utils.helpers import load_config
 import json
 import os
+import shutil
 
 def concatenate_dataframes(df_list, limit = 3):
     def _add_empty_columns(df_list, limit=3):
@@ -107,12 +109,20 @@ def generate_news_df(cuadros):
 
     return new_df_list
 
-def load_config() ->dict:
-    file = os.path.join('file_procces', 'config.json')
-    with open(file, mode='r') as config:
-        conf = json.load(config)
-    return conf
+# def load_config() ->dict:
+#     file = os.path.join('file_procces', 'config.json')
+#     with open(file, mode='r') as config:
+#         conf = json.load(config)
+#     return conf
 
+def prepare(func):
+    def wrapped(*args, **keyargs):
+        os.makedirs('file_procces', exist_ok=True)
+        func(*args, **keyargs)
+        shutil.rmtree('file_procces')
+    return wrapped
+
+@prepare
 def formating(df_master:pd.DataFrame, title_page:str):
     file = os.path.join('file_procces', 'moment.xlsx')#necesita crearse para cada ejecucion
     idx = capture_change_idx(df_master)
@@ -121,7 +131,7 @@ def formating(df_master:pd.DataFrame, title_page:str):
     wb = load_workbook(file)
     ws = wb.active
 
-    conf = load_config()
+    conf = load_config('formatting')
 
     style_new = Font(bold=True, color=conf['cl_new'])
     style_transpose = Font(bold=True, color=conf['cl_transpose'])

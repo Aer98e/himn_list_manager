@@ -21,28 +21,31 @@ def find_title(title_norm: str):
         res = cursor.fetchone()
     return res[0]
 
-def find_title_id(id: Union[int, list[int]]) -> list[str]:
+def find_title_id(id_title: Union[int, list[int]]) -> list[str]:
     def verification():
-        nonlocal id
-        if not isinstance(id, int) and not isinstance(id, list):
+        nonlocal id_title
+        if not isinstance(id_title, int) and not isinstance(id_title, list):
             raise TypeError("El parametro debe ser de tipo Int o List")
         
-        if isinstance(id, list):
-            for num in id:
+        if isinstance(id_title, list):
+            for num in id_title:
                 if not isinstance(num, int):
                     raise TypeError('El argumento id debe contener valores Int')
-        if isinstance(id, int):
-            id = [id]
+        if isinstance(id_title, int):
+            id_title = [id_title]
     
     verification()
+
+    answer=[]
     with sqlite3.connect(R_BUSQUEDA()) as conn:
         cursor = conn.cursor()
-        consult=', '.join(['?']*len(id))
+        consult=', '.join(['?']*len(id_title))
 
-        cursor.execute(f'SELECT titulo FROM Himnos WHERE id IN ({consult})', id)
-        res = cursor.fetchall()
-
-    return [title[0] for title in res]
+        for id_tit in id_title:
+            cursor.execute(f'SELECT titulo FROM Himnos WHERE id = ?', (id_tit,))
+            res = cursor.fetchone()
+            answer.append(res[0])
+    return answer
 
 
 def find_data(title_norm: str, queries: list):

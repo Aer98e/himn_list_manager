@@ -26,7 +26,7 @@ def load_config(name:str) -> dict:
             files.append(os.path.splitext(file)[0])
     
     if name not in files:
-        raise ValueError("Aun no se habilito una ruta o no eciste el archivo buscado")
+        raise ValueError("Aun no existe el archivo buscado")
  
     file = os.path.join('configs', f'{name}.json')
 

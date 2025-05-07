@@ -2,6 +2,7 @@ from .queries import find_data, load_frequencies, database_update, find_title_id
 from data_processing.extraction import extract_table_titles
 from utils.helpers import ans_y
 from interact_user.test import show_duplications_UI
+import os
 
 def generate_list_frequencies(data_tables_list):
     TITLE_COLUMN = 1
@@ -50,6 +51,17 @@ def show_duplications(frequencies: dict, show: bool=True):
     if not isinstance(frequencies, dict):
         raise ValueError("El parámetro 'frequency' debe ser un diccionario.")
     
+    def showed(duplications):
+        os.system('cls')
+        print("\n====================== DUPLICACIONES ======================\n")
+        for dupl in duplications:
+            print(f"El himno '{dupl['title']}' ha sido usado {len(dupl['dates'])} veces:")
+            for date in dupl['dates']:
+                print(f"   - {date}")
+            print("_______________________________________________________")
+        print('\n===============================================================')
+
+
     confirmation = False
     duplications = []
     
@@ -65,12 +77,9 @@ def show_duplications(frequencies: dict, show: bool=True):
                 "times_used": times,
                 "dates": data['dates']
             })
-            if show:
-                print(f"El himno '{title}' ha sido usado {times} veces:")
-                for date in data['dates']:
-                    print(f"   - {date}")
-                print("_______________________________________________________")
-    show_duplications_UI(duplications)
+    if show:
+        showed(duplications)
+    # show_duplications_UI(duplications)
     # return confirmation, duplications
     return confirmation
 
@@ -122,8 +131,9 @@ def analysis_assistant(ids_master: set):
         raise TypeError('El parametro ingresado no es de tipo Set.')
     
     def interface():
+        os.system('cls')
         print("================== Registro de uso de Himnos ==================\n")
-        print("\t1) Himnos que ya han sido usados en almenos las 2 ultimas hojas.")
+        print("\t1) Himnos que ya han sido usados en al menos las 2 ultimas hojas.")
         print("\t2) Himnos que no han sido usados en la ultima hoja.")
         print("\t3) Himnos muy poco usados.")
         print("\t4) Salir.")
@@ -133,19 +143,22 @@ def analysis_assistant(ids_master: set):
     def show_results(results: list):
         dividing:int = results[0][1]
         print("===============================================================")
+        print(f'\n==== {abs(dividing)+1} Hojas ====')
         for i, res in enumerate(results):
-            if dividing!=res[1]:
-                print()
-                dividing=res[1]
+            if dividing != res[1]:
+                dividing = res[1]
+                print(f'\n==== {abs(dividing)+1} Hojas ====')
 
             print(f'{i+1}. {res[0]}({res[1]}).')
+            # print(f'{i+1}. {res[0]}.')
         print("===============================================================")
 
     #   fq = frecucencia || ut = util || rl = real
     prev_freq = load_frequencies()
     dict_prev_freq = {dat[0]: {'freq_util':dat[1], 'freq_real':dat[2]} for dat in prev_freq}
-    fq_rl = [(id, freq['freq_real']) for id, freq in dict_prev_freq.items() if freq['freq_real']]
-    fq_rl.sort(key=lambda x:x[1], reverse=True)
+    
+    fq_rl = [(id, freq['freq_real']) for id, freq in dict_prev_freq.items()]
+    fq_rl.sort(key=lambda x:x[1])
 
     id_sheet = [id for id in dict_prev_freq if id in ids_master]
     id_used = list(filter(lambda id :dict_prev_freq[id]['freq_util'] > 1, id_sheet))
@@ -169,22 +182,23 @@ def analysis_assistant(ids_master: set):
             result.sort(key=lambda x:x[1])
             
         elif ans == '3':
-            limit=20
-            titles == find_title_id([dat[0] for dat in fq_rl[:limit]])
-            result = list(zip(titles, fq_rl[:limit]))
+            limit = 25
+            titles = find_title_id([dat[0] for dat in fq_rl[:limit]])
+            result = list(zip(titles, [dat[1] for dat in fq_rl[:limit]]))
+        
         elif ans == '4':
             break
 
         else:
-            print('=_=_= ¡Error! =_=_= Opción Invalida =_=_= Intente Nuevamente =_=_=')
+            print('\n\n\t=_=_= ¡Error! =_=_= Opción Invalida =_=_= Intente Nuevamente =_=_=\n\n')
             continue
 
         show_results(result)
         
-
-        ans_2 = input('\n\tDesea finalizar?: ').strip()
-        if ans_2.lower()  in ans_y:
-            break
+        input('Presione una tecla para continuar...')
+        # ans_2 = input('\n\tDesea finalizar?: ').strip()
+        # if ans_2.lower()  in ans_y:
+        #     break
 
    
 

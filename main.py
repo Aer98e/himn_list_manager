@@ -31,6 +31,7 @@ def main():
     duplications = show_duplications(frequencies)
     if not duplications:
         print('No se encontro repeticion de himnos.')
+    input('Presione una tecla para continuar...')
     
     analysis_assistant(set(frequencies.keys()))
     

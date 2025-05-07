@@ -6,7 +6,10 @@ import functools
 
 def search_path():
     conf = load_config('path_file')
-    initial_dir = os.path.expanduser("~") if not conf["path"] else conf["path"]
+    if os.path.exists(conf["path"]):
+        initial_dir = os.path.expanduser("~") if not conf["path"] else conf["path"]
+    else:
+        initial_dir=None
     return initial_dir
 
 def verify_path(func):

@@ -115,15 +115,8 @@ def generate_news_df(cuadros):
 #         conf = json.load(config)
 #     return conf
 
-def prepare(func):
-    def wrapped(*args, **keyargs):
-        os.makedirs('file_procces', exist_ok=True)
-        func(*args, **keyargs)
-        shutil.rmtree('file_procces')
-    return wrapped
-
-@prepare
 def formating(df_master:pd.DataFrame, title_page:str):
+    os.makedirs('file_procces', exist_ok=True)
     file = os.path.join('file_procces', 'moment.xlsx')#necesita crearse para cada ejecucion
     idx = capture_change_idx(df_master)
 

@@ -60,6 +60,8 @@ def show_duplications(frequencies: dict, show: bool=True):
                 print(f"   - {date}")
             print("_______________________________________________________")
         print('\n===============================================================')
+        input('Presione enter para continuar...')
+
 
 
     confirmation = False
@@ -77,7 +79,7 @@ def show_duplications(frequencies: dict, show: bool=True):
                 "times_used": times,
                 "dates": data['dates']
             })
-    if show:
+    if show and confirmation:
         showed(duplications)
     # show_duplications_UI(duplications)
     # return confirmation, duplications
@@ -126,7 +128,7 @@ def update_frequency_hymns(new_freq, automatic: bool = False):
             return None
     database_update(data_update)
         
-def analysis_assistant(ids_master: set):
+def analysis_assistant(ids_master: set) -> bool:
     if not isinstance(ids_master, set):
         raise TypeError('El parametro ingresado no es de tipo Set.')
     
@@ -136,7 +138,8 @@ def analysis_assistant(ids_master: set):
         print("\t1) Himnos que ya han sido usados en al menos las 2 ultimas hojas.")
         print("\t2) Himnos que no han sido usados en la ultima hoja.")
         print("\t3) Himnos muy poco usados.")
-        print("\t4) Salir.")
+        print("\t4) Volver a procesar.")
+        print("\t5) Continuar.")
 
         ans = input('Ingrese el número de su opción: ').strip()
         return ans
@@ -187,12 +190,16 @@ def analysis_assistant(ids_master: set):
             result = list(zip(titles, [dat[1] for dat in fq_rl[:limit]]))
         
         elif ans == '4':
-            break
+            return True
+        
+        elif ans == '5':
+            return False
 
         else:
             print('\n\n\t=_=_= ¡Error! =_=_= Opción Invalida =_=_= Intente Nuevamente =_=_=\n\n')
+            input('Presione enter para intentar de nuevo...')
             continue
-
+        
         show_results(result)
         
         input('Presione una tecla para continuar...')

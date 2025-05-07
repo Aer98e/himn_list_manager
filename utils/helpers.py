@@ -15,9 +15,9 @@ def limpiar_texto1(texto:str):
     return texto
 
 def present_new_file(new_path:str):
-
     path = os.path.join('file_procces', 'moment.xlsx')
     shutil.move(path, new_path)
+    shutil.rmtree('file_procces')
 
 def load_config(name:str) -> dict:
     files=[]

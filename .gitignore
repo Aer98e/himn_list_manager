@@ -5,3 +5,6 @@ __pycache__
 moment_2.py
 local_1
 moment_3.py
+requirements.hash
+# database/search_ref.db
+# config/path_file.json

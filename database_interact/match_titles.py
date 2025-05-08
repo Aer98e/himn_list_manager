@@ -1,7 +1,7 @@
 from data_processing.extraction import extract_table_titles
 from utils.helpers import limpiar_texto1, ans_y
 from rapidfuzz import fuzz, process
-from .queries import update_search_list, find_title, Buscar_Columna
+from .queries import update_search_list, find_title, Buscar_Columna, catch_normalize_titles
 from .file_names import R_BUSQUEDA
 import numpy as np
 
@@ -32,7 +32,7 @@ def add_titles_stranges(cuadros):
         - For lower scores, the user is prompted to confirm if the titles are the same.
         - Titles that cannot be matched or confirmed are added to the `not_find` list.
     """
-    def extract_titles():
+    def extract_titles() -> set:
         TITLE_COLUMN = 1
         slave_set = set()
         for cuadro in cuadros:
@@ -42,16 +42,18 @@ def add_titles_stranges(cuadros):
         return slave_set
 
     def init_master():
-        master_list_norm = Buscar_Columna(R_BUSQUEDA(), 'Indice_busqueda', 'titulo_norm')
-        master_set_norm = {title for title in master_list_norm}
+        master_list_norm = catch_normalize_titles()
+        master_set_norm = set(master_list_norm)
         master_list_norm = list(master_set_norm)
 
         return master_list_norm, master_set_norm
     
-    def init_slave(master_set_norm):
+    def init_slave(master_set_norm: set):
         slave_set = extract_titles()
         slave_dict = {limpiar_texto1(title): title for title in slave_set}
-        slave_util = set(slave_dict.keys()) - master_set_norm
+
+        #Filtro el conjunto para solo procesar los titulos que no estan aun en la base de datos.
+        slave_util = set(slave_dict.keys()) - master_set_norm 
         if not slave_util:
             print('No hay himnos nuevos')
             return None, None
@@ -62,23 +64,23 @@ def add_titles_stranges(cuadros):
         match_matrix = process.cdist(slave_util, master_list_norm, scorer = fuzz.partial_ratio, score_cutoff = 60)
         return match_matrix
 
-    def find_best_match(match_matrix, master_list_norm):
+    def find_best_match(match_matrix, master_list_norm:list):
         best_matches = []
         for i, row in enumerate(match_matrix):
             best_index = np.argsort(row)[::-1][:5]
             best_matches.append([(master_list_norm[j], row[j]) for j in best_index])
         return best_matches
     
-    def update_database(best_matches, title_slave, title_slave_norm, not_find:list):
-        RATIO = 1
-        TITLE = 0
-        find = False
+    def update_database(best_matches:list, title_slave:str, title_slave_norm:str, not_find:list):
+        RATIO_IDX = 1
+        TITLE_IDX = 0
+        # find = False
         for i, match_a in enumerate(best_matches):
-            if match_a[RATIO] >= 85:
-                update_search_list(title_slave_norm, match_a[TITLE])
+            if match_a[RATIO_IDX] >= 85:
+                update_search_list(title_slave_norm, match_a[TITLE_IDX])
                 break
             
-            possible_match = find_title(match_a[TITLE])
+            possible_match = find_title(match_a[TITLE_IDX])
             print('----------------------------------')
             print("Son el mismo himno?")
             print(f'--{title_slave}')
@@ -87,9 +89,9 @@ def add_titles_stranges(cuadros):
             print("")
 
             if ans.lower() in ans_y:
-                update_search_list(title_slave_norm, match_a[TITLE])
+                update_search_list(title_slave_norm, match_a[TITLE_IDX])
             
-            elif not find and i == len(best_matches)-1:
+            elif i == len(best_matches)-1:
                 not_find.append(title_slave)
             
 

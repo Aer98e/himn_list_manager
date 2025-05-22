@@ -50,7 +50,13 @@ if __name__ == "__main__":
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     venv_dir = os.path.join(script_dir, "local_1")
-    python_exe = os.path.join(venv_dir, "Scripts", "python.exe")
+
+    # Determine the Python executable path based on the OS
+    if os.name == 'nt':  # Windows
+        python_exe = os.path.join(venv_dir, "Scripts", "python.exe")
+    else:  # macOS, Linux, and other POSIX-like systems
+        python_exe = os.path.join(venv_dir, "bin", "python")
+
     req_file = os.path.join(script_dir, "requirements.txt")
     req_hash_file = os.path.join(script_dir, "requirements.hash")
     main_script = os.path.join(script_dir, "main.py")

@@ -1,78 +1,152 @@
 import re
 import datetime
-ROW_DATE = 0
-COLUMN_DATE = 1
+from typing import List, Optional, Any # For type hinting
+import pandas as pd # For type hinting DataFrames
 
-def get_correct_days(cuadros, month = None, year = None):    
-    WEEKEN = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']
-    def extract_days(cuadros):
-        days = []
-        for cuadro in cuadros:
-            day = cuadro.iat[ROW_DATE, COLUMN_DATE]
-            day = str(day)
-            num = re.search(r'\d+', day)
-            if num is not None:
-                days.append(int(num[0]))
-            else:
-                print(f'No se pudo extraer el día de la cadena: {day}')
-                # raise ValueError()
-        return days
+# Constants for accessing date elements in DataFrames
+DATE_ROW_INDEX = 0
+DATE_COLUMN_INDEX = 1
 
-    def get_text_day(date:datetime.date):
-        day = date.day
-        week_num = date.weekday()
-        return f'{WEEKEN[week_num]} {day:02}'
+# Weekday names in Spanish, as used by the original get_text_day function.
+# Consider localizing or making this configurable if supporting multiple languages.
+WEEKDAY_NAMES_ES = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO']
 
-    dates = []
-    # Obtener fecha actual
-    today = datetime.date.today()
-    year = today.year if year is None else year
-    month = today.month if month is None else month
-    # print(f'año:{year}, mes {month}')
-
-    day_list = extract_days(cuadros)
-    afternoon = False
-
-    for i, day in enumerate(day_list):
-        table_date = datetime.date(year, month, day)
-        if table_date < today:#El igual permitira trabajar ese mismo dia o no.
-            dates.append(None)
-            continue
-        
-        text_date = get_text_day(table_date)
-
-        if afternoon:
-            text_date += ' T'
-            afternoon = False
-        
-        elif i < len(day_list)-1 and day == day_list[i+1]:  
-            text_date += ' M'
-            afternoon = True
-        
-        dates.append(text_date)
-    return dates
-    
-def filter_tables_day(cuadros, new_dates):
-    """Crea una lista de dataframes(cuadros de himnos), usando la fecha para filtrar cuadros pasados.
-    Arg:
-        cuadros: Lista de dataframes(cuadros de himnos).
-        new_dates: Lista de fechas filtradas. 
-    Returns:
-        new_cuadros: Lista de dataframes(cuadros de himnos) filtrados por fecha.
-    
-    Se debe tener a consideración que new_dates, debe ser filtrado con la función
-    get_correct_days, y que está pensado exclusivamente para cuadros de un tipo.
+def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int] = None, year: Optional[int] = None) -> List[Optional[str]]:    
     """
-    new_cuadros = []
-    for i in range(len(cuadros)):
-        if new_dates[i] is None:
+    Generates a list of formatted date strings for scheduling based on day numbers extracted
+    from a list of DataFrames. It filters out past dates and adds 'M' (Morning) or 'T' (Afternoon)
+    suffixes for same-day events.
+
+    Args:
+        data_frames (List[pd.DataFrame]): A list of DataFrames, where each DataFrame is expected
+                                         to have a date cell at [DATE_ROW_INDEX, DATE_COLUMN_INDEX]
+                                         from which the day number is extracted.
+        month (Optional[int]): The month to use for constructing dates. Defaults to the current month.
+        year (Optional[int]): The year to use for constructing dates. Defaults to the current year.
+
+    Returns:
+        List[Optional[str]]: A list of formatted date strings (e.g., "LUNES 01 M") or None for
+                             dates that are in the past.
+    """
+    
+    def extract_day_numbers_from_frames(frames: List[pd.DataFrame]) -> List[int]:
+        """Helper function to extract day numbers from the date cell of each DataFrame."""
+        day_numbers = []
+        for frame in frames:
+            # Access the cell expected to contain the date information
+            date_cell_value = str(frame.iat[DATE_ROW_INDEX, DATE_COLUMN_INDEX])
+            # Search for the first sequence of digits in the cell value
+            match = re.search(r'\d+', date_cell_value)
+            if match:
+                day_numbers.append(int(match.group(0)))
+            else:
+                # Log or handle cases where day number cannot be extracted
+                print(f'Could not extract day number from string: {date_cell_value}')
+                # Consider raising a ValueError or appending a placeholder if critical
+        return day_numbers
+
+    def format_date_text(date_obj: datetime.date) -> str:
+        """Helper function to format a date object into 'WEEKDAY DD' string."""
+        day_of_month = date_obj.day
+        weekday_index = date_obj.weekday() # Monday is 0 and Sunday is 6
+        return f'{WEEKDAY_NAMES_ES[weekday_index]} {day_of_month:02}'
+
+    schedule_date_texts = []
+    current_date = datetime.date.today()
+    
+    # Use provided month/year or default to current month/year
+    effective_year = year if year is not None else current_date.year
+    effective_month = month if month is not None else current_date.month
+
+    extracted_day_numbers = extract_day_numbers_from_frames(data_frames)
+    is_afternoon_slot = False # Flag to track if the next event is an afternoon slot for a duplicated day
+
+    for i, day_num in enumerate(extracted_day_numbers):
+        try:
+            event_date = datetime.date(effective_year, effective_month, day_num)
+        except ValueError as e:
+            # Handle invalid dates (e.g., February 30th)
+            print(f"Invalid date created for day {day_num}, month {effective_month}, year {effective_year}: {e}")
+            schedule_date_texts.append(None) # Or some other error indicator
             continue
-        cuadros[i].iat[ROW_DATE, COLUMN_DATE] = new_dates[i]
-        new_cuadros.append(cuadros[i].copy())
-    return new_cuadros
+
+        # Skip processing for dates in the past
+        if event_date < current_date:
+            schedule_date_texts.append(None)
+            continue
+        
+        formatted_date_text = format_date_text(event_date)
+
+        if is_afternoon_slot:
+            formatted_date_text += ' T' # Append 'T' for Tarde (Afternoon)
+            is_afternoon_slot = False # Reset flag
+        # Check if the next day number is the same as the current one, indicating morning/afternoon slots
+        elif (i < len(extracted_day_numbers) - 1) and (day_num == extracted_day_numbers[i+1]):  
+            formatted_date_text += ' M' # Append 'M' for Mañana (Morning)
+            is_afternoon_slot = True # Set flag for the next iteration
+        
+        schedule_date_texts.append(formatted_date_text)
+        
+    return schedule_date_texts
+    
+def filter_data_frames_by_date(data_frames: List[pd.DataFrame], schedule_dates: List[Optional[str]]) -> List[pd.DataFrame]:
+    """
+    Filters a list of DataFrames based on a corresponding list of schedule dates.
+    Only DataFrames whose schedule date is not None are kept. The date cell in the
+    kept DataFrames is updated with the new schedule date string.
+
+    Args:
+        data_frames (List[pd.DataFrame]): The list of DataFrames to filter.
+        schedule_dates (List[Optional[str]]): A list of generated schedule dates.
+                                              Must correspond index-wise to data_frames.
+
+    Returns:
+        List[pd.DataFrame]: A new list containing only the DataFrames for valid, future dates,
+                            with their date cells updated.
+    
+    Note:
+        It's crucial that `schedule_dates` is generated by a function like `generate_schedule_dates`
+        and aligns with the `data_frames` list.
+    """
+    if len(data_frames) != len(schedule_dates):
+        raise ValueError("The length of data_frames and schedule_dates lists must be identical.")
+
+    filtered_data_frames = []
+    for i, frame in enumerate(data_frames):
+        if schedule_dates[i] is None: # Skip if the date was filtered out (e.g., past date)
+            continue
+        
+        # Create a copy to avoid modifying the original DataFrame in the input list
+        updated_frame = frame.copy()
+        # Update the date cell with the new formatted schedule date string
+        updated_frame.iat[DATE_ROW_INDEX, DATE_COLUMN_INDEX] = schedule_dates[i]
+        filtered_data_frames.append(updated_frame)
+        
+    return filtered_data_frames
 
 def main():
+    # Example Usage (assuming you have some sample DataFrames)
+    # Sample DataFrames (replace with actual data loading or creation)
+    # df1 = pd.DataFrame({0: ['Some data', 'Data'], 1: ['Día 25', 'More data']}) 
+    # df2 = pd.DataFrame({0: ['Some data', 'Data'], 1: ['Día 25', 'More data']}) # Same day for M/T test
+    # df3 = pd.DataFrame({0: ['Some data', 'Data'], 1: ['Día 1', 'Old data']}) # Past date (if current day > 1)
+    # df4 = pd.DataFrame({0: ['Some data', 'Data'], 1: ['Día 28', 'Future data']})
+
+    # sample_frames = [df1, df2, df3, df4]
+    
+    # current_month = datetime.date.today().month
+    # current_year = datetime.date.today().year
+
+    # generated_dates = generate_schedule_dates(sample_frames, month=current_month, year=current_year)
+    # print("Generated Schedule Dates:", generated_dates)
+    
+    # filtered_frames = filter_data_frames_by_date(sample_frames, generated_dates)
+    # print(f"\nNumber of original frames: {len(sample_frames)}")
+    # print(f"Number of filtered frames: {len(filtered_frames)}")
+    # for i, frame in enumerate(filtered_frames):
+    #     print(f"\nFiltered Frame {i+1} (Date: {frame.iat[DATE_ROW_INDEX, DATE_COLUMN_INDEX]}):")
+    #     print(frame)
     pass
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     main()

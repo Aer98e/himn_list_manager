@@ -2,211 +2,338 @@ import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
-from .extraction import extract_table_titles, capture_change_idx
-from database_interact.queries import extract_data_db
-from utils.helpers import load_config
-import json
+from .extraction import extract_table_titles, capture_format_change_indices # Renamed capture_change_idx
+from database_interact.queries import extract_hymn_data_for_display # Renamed extract_data_db
+from utils.helpers import load_config_from_json # Renamed load_config
+from typing import List, Dict, Any # For type hinting
 import os
-import shutil
+import logging # Import logging
 
-def concatenate_dataframes(df_list, limit = 3):
-    def _add_empty_columns(df_list, limit=3):
+# Get a logger for this module
+logger = logging.getLogger(__name__)
+
+# shutil is not used in this refactored version directly, but os is used for path operations.
+
+def assemble_master_dataframe(data_frame_list: List[pd.DataFrame], max_frames_per_row: int = 3) -> pd.DataFrame:
+    """
+    Concatenates a list of DataFrames into a single master DataFrame.
+    DataFrames are grouped into rows, with a specified maximum number of frames per row.
+    Empty columns are added for spacing if a row group has fewer than max_frames_per_row.
+    Empty rows are added for spacing between rows of DataFrame groups.
+
+    Args:
+        data_frame_list (List[pd.DataFrame]): The list of DataFrames to concatenate.
+        max_frames_per_row (int): The maximum number of DataFrames to place side-by-side in one row block.
+
+    Returns:
+        pd.DataFrame: A single DataFrame containing all input DataFrames arranged and spaced.
+    """
+
+    def _group_dataframes_with_padding(frames_list: List[pd.DataFrame], limit: int) -> List[List[pd.DataFrame]]:
         """
-        Agrupa DataFrames en listas, cada una sera una fila, y añade columnas vacías según un límite.
-        Esta funcion aun mantiene los dataframes en una lista, sin concatenarlos.
-
-        Args:
-            df_list (list): Lista de DataFrames.
-            limit (int): Número máximo de DataFrames por grupo.
-
-        Returns:
-            list: Lista de filas de DataFrames agrupados.
+        Groups DataFrames into lists (rows), adding empty 'spacer' columns as needed.
+        Each sublist represents a row of DataFrames to be concatenated horizontally.
         """
-        current_group = []
-        grouped_dataframes = []
-        limit_counter = 0
+        current_row_group = []
+        all_row_groups = []
+        frames_in_current_group_count = 0
 
-        for i, df_i in enumerate(df_list):
-            df:pd.DataFrame = df_i.copy()      # Copia el DataFrame original para evitar modificarlo directamente
-            df.reset_index(drop=True, inplace=True)     # Reinicia el índice del DataFrame
-            limit_counter += 1
+        for i, df_original in enumerate(frames_list):
+            df = df_original.copy()  # Work with a copy
+            df.reset_index(drop=True, inplace=True) # Ensure clean index
+            frames_in_current_group_count += 1
 
-            if i < len(df_list)-1:
-
-                if limit_counter < limit:
-                    df['empty'] = None
-                
-                else:
-                    limit_counter = 0
-                    current_group.append(df)
-                    grouped_dataframes.append(current_group)
-                    current_group = []
-                    continue
-                
-                current_group.append(df)
+            # Add a spacer column if this DataFrame is not the last in its group AND not the last overall
+            if frames_in_current_group_count < limit and i < len(frames_list) -1 : # Check i to prevent adding spacer to last element if it starts a new row
+                 df['spacer_column'] = None # Add an empty column for spacing
             
-            else:
-                current_group.append(df)
-                grouped_dataframes.append(current_group)
+            current_row_group.append(df)
+
+            if frames_in_current_group_count == limit or i == len(frames_list) - 1:
+                all_row_groups.append(current_row_group)
+                current_row_group = [] # Reset for the next group
+                frames_in_current_group_count = 0
         
-        return grouped_dataframes
+        return all_row_groups
 
-    def _concatenate_column(row_packet_list):
-        row_list = []
+    def _concatenate_dataframes_horizontally(grouped_frames: List[List[pd.DataFrame]]) -> List[pd.DataFrame]:
+        """Concatenates each group of DataFrames horizontally to form a single row DataFrame."""
+        concatenated_rows = []
+        for row_group in grouped_frames:
+            # Concatenate DataFrames in the current group along axis=1 (columns)
+            result_row_df = pd.concat(row_group, axis=1, ignore_index=True)
+            concatenated_rows.append(result_row_df)
+        return concatenated_rows
 
-        for row_pack in row_packet_list:
-            result = pd.concat(row_pack, axis=1, ignore_index=True)  # Apila las columnas formando una fila
-            row_list.append(result)
+    def _concatenate_rows_vertically_with_spacing(row_dataframes: List[pd.DataFrame]) -> pd.DataFrame:
+        """Concatenates row DataFrames vertically, adding an empty spacer row between them."""
+        if not row_dataframes:
+            return pd.DataFrame() # Return empty DataFrame if input is empty
 
-        return row_list
-
-    def _concatenate_row(rows_list):
-        empty_row = pd.DataFrame({col:[None] for col in rows_list[0].columns})  # Crea una fila vacía con las mismas columnas que el primer DataFrame
-        with_empty_row = []
-        for i, df in enumerate(rows_list):
-            with_empty_row.append(df)
-            if i < len(rows_list) - 1:
-                with_empty_row.append(empty_row)
+        # Create an empty row with the same columns as the first DataFrame for spacing
+        # Ensure all columns are string type to avoid issues with pd.concat if dtypes differ
+        empty_row_columns = {str(col): [None] for col in row_dataframes[0].columns}
+        empty_spacer_row = pd.DataFrame(empty_row_columns) 
+        
+        final_layout_with_spacers = []
+        for i, single_row_df in enumerate(row_dataframes):
+            # Ensure consistent column naming (as strings) before concatenation
+            single_row_df.columns = [str(col) for col in single_row_df.columns]
+            final_layout_with_spacers.append(single_row_df)
+            if i < len(row_dataframes) - 1: # Add spacer if not the last row DataFrame
+                final_layout_with_spacers.append(empty_spacer_row)
                 
-        result = pd.concat(with_empty_row, ignore_index=True)  # Apila las filas
-        return result
+        # Concatenate all (row DataFrames and spacer rows) along axis=0 (rows)
+        master_df = pd.concat(final_layout_with_spacers, ignore_index=True)
+        return master_df
 
-    rows_pack = _add_empty_columns(df_list, limit)
-    rows_list = _concatenate_column(rows_pack)
-    df_master = _concatenate_row(rows_list)
-    return df_master
+    # Main logic for assemble_master_dataframe
+    if not data_frame_list:
+        return pd.DataFrame() # Handle empty input list
 
-def generate_news_df(cuadros):
-    new_df_list=[]
-
-    def generate_df(date:str):
-        date_sign=date+'::D'if 'DOMINGO' in date else date+'::O'
-        columns_text=[['', date_sign, 'O', 'N']]
-        new_df = pd.DataFrame(columns_text)
-        return new_df
+    grouped_df_rows = _group_dataframes_with_padding(data_frame_list, max_frames_per_row)
+    horizontally_concatenated_rows = _concatenate_dataframes_horizontally(grouped_df_rows)
+    final_master_dataframe = _concatenate_rows_vertically_with_spacing(horizontally_concatenated_rows)
     
-    def add_data(df, data):
-        index = len(df)
-        new_row_content = [index]
-        for dat in data:
-            if dat is not None:
-                new_row_content.append(dat)
+    return final_master_dataframe
+
+
+def generate_hymn_dataframes(raw_data_frames: List[pd.DataFrame]) -> List[pd.DataFrame]:
+    """
+    Processes a list of raw DataFrames (extracted from Excel cells, representing hymn groups by date)
+    into a new list of DataFrames. Each new DataFrame is structured for display, containing
+    hymn details fetched from the database.
+
+    Args:
+        raw_data_frames (List[pd.DataFrame]): A list of DataFrames, where each typically holds
+                                             hymn titles for a specific date.
+
+    Returns:
+        List[pd.DataFrame]: A list of newly generated DataFrames, formatted with hymn data.
+
+    Raises:
+        ValueError: If a hymn title extracted from a raw DataFrame is not found in the database.
+    """
+    processed_df_list = []
+
+    def create_hymn_dataframe_shell(date_string: str) -> pd.DataFrame:
+        """Helper to create the initial structure of a hymn DataFrame for a given date."""
+        # Determine date suffix based on whether 'DOMINGO' (Sunday) is in the date string
+        date_suffix = '::D' if 'DOMINGO' in date_string.upper() else '::O' # Use .upper() for case-insensitivity
+        # Define column headers for the new DataFrame. 'O' and 'N' might be placeholders or specific codes.
+        column_headers = [['', date_string + date_suffix, 'O', 'N']] 
+        new_hymn_df = pd.DataFrame(column_headers)
+        return new_hymn_df
+    
+    def add_hymn_row_to_dataframe(df: pd.DataFrame, hymn_details: List[Any]):
+        """Helper to add a row of hymn data to the DataFrame."""
+        current_row_index = len(df) # Next available index
+        # First element of the new row is its index (or a counter)
+        new_row_data = [current_row_index] 
+        for detail in hymn_details:
+            new_row_data.append(detail if detail is not None else '-') # Replace None with '-'
+        df.loc[current_row_index] = new_row_data
+
+    for raw_frame in raw_data_frames:
+        # Extract titles; assumes title is in column 1, includes date from first row.
+        hymn_titles_with_date = extract_table_titles(raw_frame, 1, include_date=True) 
+        
+        if not hymn_titles_with_date: # Skip if no titles (or date) were extracted
+            continue
+
+        date_header = hymn_titles_with_date[0] # First item is the date
+        hymn_df_shell = create_hymn_dataframe_shell(str(date_header))
+
+        for title in hymn_titles_with_date[1:]: # Process actual hymn titles
+            # Fetch hymn data from database (function name changed for clarity)
+            current_hymn_data = extract_hymn_data_for_display(str(title)) 
+            if current_hymn_data:
+                add_hymn_row_to_dataframe(hymn_df_shell, current_hymn_data)
             else:
-                new_row_content.append('-')
-        df.loc[index] = new_row_content
+                # Handle case where hymn data is not found
+                raise ValueError(f'Hymn not found in database: {title}')
+        processed_df_list.append(hymn_df_shell)
 
-    for cuadro in cuadros:
-        titles_cuadro = extract_table_titles(cuadro, 1, complete=True)
-        new_df = generate_df(titles_cuadro[0])
+    return processed_df_list
 
-        for title in titles_cuadro[1:]:
-            data_curr = extract_data_db(title)
-            if data_curr:
-                add_data(new_df, data_curr)
-            else:
-                raise ValueError(f'No se encontró el himno: {title}, en la base de datos.')
-        new_df_list.append(new_df)
 
-    return new_df_list
+def apply_excel_formatting(master_df: pd.DataFrame, page_title: str, temp_dir: str = 'file_procces'):
+    """
+    Applies formatting to an Excel file generated from the master DataFrame.
+    This includes setting cell styles (font, fill, alignment), row heights, and column widths
+    based on a configuration file. Also adds a main title to the sheet.
 
-# def load_config() ->dict:
-#     file = os.path.join('file_procces', 'config.json')
-#     with open(file, mode='r') as config:
-#         conf = json.load(config)
-#     return conf
+    Args:
+        master_df (pd.DataFrame): The DataFrame to be written and formatted in Excel.
+        page_title (str): The main title to be displayed at the top of the Excel sheet.
+        temp_dir (str, optional): Temporary directory to store the intermediate Excel file.
+                                  Defaults to 'file_procces'.
+    """
+    os.makedirs(temp_dir, exist_ok=True) # Ensure temporary directory exists
+    excel_file_path = os.path.join(temp_dir, 'temp_schedule.xlsx') # Temporary file
 
-def formating(df_master:pd.DataFrame, title_page:str):
-    os.makedirs('file_procces', exist_ok=True)
-    file = os.path.join('file_procces', 'moment.xlsx')#necesita crearse para cada ejecucion
-    idx = capture_change_idx(df_master)
+    # Get indices of cells that need special formatting (e.g., new hymns, transposed hymns)
+    # Function name changed for clarity
+    format_indices = capture_format_change_indices(master_df) 
 
-    df_master.to_excel(file, index=False, header=False)
-    wb = load_workbook(file)
-    ws = wb.active
-
-    conf = load_config('formatting')
-
-    style_new = Font(bold=True, color=conf['cl_new'])
-    style_transpose = Font(bold=True, color=conf['cl_transpose'])
-    fill_red = PatternFill(start_color=conf['fill_red'], end_color=conf['fill_red'], fill_type="solid")
-    fill_green = PatternFill(start_color=conf['fill_green'], end_color=conf['fill_green'], fill_type="solid")
-    fill_sunday = PatternFill(start_color=conf['fill_sunday'], end_color=conf['fill_sunday'], fill_type="solid")
-    fill_other_day = PatternFill(start_color=conf['fill_other_day'], end_color=conf['fill_other_day'], fill_type="solid")
-    alg_center = Alignment(horizontal = 'center')
-
-    general_size = Font(size=conf['general_size'])
-    header_size = conf['header_size']
-
-    styles = {'new':style_new, 'transpose':style_transpose}
-    fills = {'red':fill_red, 'green':fill_green, 'sunday':fill_sunday, 'other_day':fill_other_day}
-
-    for row_idx in range(1, ws.max_row+1):
-        height = 0
-        derivation = row_idx % 8
-
-        if derivation in (0, 1):
-            height = conf['row_headers']
-
-            if derivation == 1:
-                for cell in ws[row_idx]:
-                    cell.font = Font(size=header_size, bold=True)
-                    cell.alignment = alg_center
+    # Write DataFrame to Excel without index or header (as formatting is custom)
+    master_df.to_excel(excel_file_path, index=False, header=False)
     
-        elif derivation in (2, 3, 4, 5, 6, 7):
-            height = conf['row_general']
+    # Load workbook and active worksheet for styling with openpyxl
+    try:
+        workbook = load_workbook(excel_file_path)
+        worksheet = workbook.active
+    except Exception as e: # Broad exception for openpyxl loading errors
+        logger.error(f"Error loading the temporary Excel workbook '{excel_file_path}': {e}", exc_info=True) # Replaced print
+        # Depending on policy, might want to clean up excel_file_path here or let a higher level handle it.
+        return # Cannot proceed with formatting
 
-            for cell in ws[row_idx]:
-                cell.font = general_size
+    # Load formatting configurations from JSON file
+    try:
+        config = load_config_from_json('formatting')
+    except ValueError as e: # Raised by load_config_from_json if file not found
+        logger.error(f"Error loading formatting configuration: {e}", exc_info=True) # Replaced print
+        return # Cannot proceed
+    except KeyError as e: # Should be caught by load_config_from_json if JSON is malformed
+        logger.error(f"Error: Missing key in formatting configuration: {e}", exc_info=True) # Replaced print
+        return # Cannot proceed
+    except Exception as e: # Other unexpected errors during config load
+        logger.error(f"An unexpected error occurred loading formatting configuration: {e}", exc_info=True) # Replaced print
+        return
 
-        ws.row_dimensions[row_idx].height = height
+
+    # Define styles and fills based on configuration
+    # Add .get() for resilience against missing keys, with defaults or error handling
+    try:
+        style_new_hymn = Font(bold=True, color=config.get('cl_new', '000000')) # Default to black if key missing
+        style_transposed_hymn = Font(bold=True, color=config.get('cl_transpose', '000000'))
+        fill_red_indicator = PatternFill(start_color=config.get('fill_red', 'FFFFFF'), end_color=config.get('fill_red', 'FFFFFF'), fill_type="solid") # Default white
+        fill_green_indicator = PatternFill(start_color=config.get('fill_green', 'FFFFFF'), end_color=config.get('fill_green', 'FFFFFF'), fill_type="solid")
+        fill_sunday_date = PatternFill(start_color=config.get('fill_sunday', 'FFFFFF'), end_color=config.get('fill_sunday', 'FFFFFF'), fill_type="solid")
+        fill_other_day_date = PatternFill(start_color=config.get('fill_other_day', 'FFFFFF'), end_color=config.get('fill_other_day', 'FFFFFF'), fill_type="solid")
         
-    for col_idx in range(1, ws.max_column+1):
-        width = 0
-        letter = get_column_letter(col_idx)
-        derivation = col_idx % 5
-
-        if derivation == 1:
-            width = conf['col_idx']
-
-            for column in ws.iter_cols(min_col=col_idx, max_col=col_idx):
-                for cell in column:
-                    cell.alignment = alg_center
+        default_font_size_val = config.get('general_size', 11) # Default font size
+        default_font_size = Font(size=default_font_size_val)
+        header_font_size_val = config.get('header_size', 12) # Default header font size
         
-        elif derivation == 2:
-            width = conf['col_title']
+        # For keys that are essential for structure, direct access might be okay,
+        # or check with .get() and raise a more specific error if not found.
+        row_headers_height = config['row_headers']
+        row_general_height = config['row_general']
+        col_idx_width = config['col_idx']
+        col_title_width = config['col_title']
+        col_numbers_width = config['col_numbers']
+        col_space_width = config.get('col_space', 5) # Optional spacer column
         
-        elif derivation in (3, 4):
-            width = conf['col_numbers']
+        main_title_font_name = config.get('style_name', 'Arial')
+        main_title_font_size = config.get('size_name', 16)
+        main_title_spacer_height = config.get('distance_name', 10)
 
-            for column in ws.iter_cols(min_col=col_idx, max_col=col_idx):
-                for i, cell in enumerate(column,1):
-                    cell.font = Font(size=header_size, bold=cell.font.bold)
-                    cell.alignment = alg_center
-        
-        elif derivation == 0:
-            width = conf['col_space']
+    except KeyError as e:
+        logger.error(f"Critical key missing in 'formatting.json': {e}. Cannot apply formatting.", exc_info=True) # Replaced print
+        return
+    except Exception as e: # Catch any other errors during config access
+        logger.error(f"Unexpected error accessing formatting configuration values: {e}", exc_info=True) # Replaced print
+        return
+
+    center_alignment = Alignment(horizontal='center')
     
-        ws.column_dimensions[letter].width = width
+    # Define styles and fills based on configuration
+    style_new_hymn = Font(bold=True, color=config['cl_new'])
+    style_transposed_hymn = Font(bold=True, color=config['cl_transpose'])
+    fill_red_indicator = PatternFill(start_color=config['fill_red'], end_color=config['fill_red'], fill_type="solid")
+    fill_green_indicator = PatternFill(start_color=config['fill_green'], end_color=config['fill_green'], fill_type="solid")
+    fill_sunday_date = PatternFill(start_color=config['fill_sunday'], end_color=config['fill_sunday'], fill_type="solid")
+    fill_other_day_date = PatternFill(start_color=config['fill_other_day'], end_color=config['fill_other_day'], fill_type="solid")
+    center_alignment = Alignment(horizontal='center')
 
-    for key, style in styles.items():
-        for i, j in idx[key]:
-            ws.cell(row=i+1, column=j+1).font += style
+    default_font_size = Font(size=config['general_size'])
+    header_font_size_val = config['header_size'] # Assuming this is just the size, not a Font object
 
-    for key, fill in fills.items():
-        for i, j in idx[key]:
-            ws.cell(row=i+1, column=j+1).fill = fill
+    # Map configuration keys to actual style objects for easier lookup
+    cell_styles_map = {'new': style_new_hymn, 'transpose': style_transposed_hymn}
+    cell_fills_map = {'red': fill_red_indicator, 'green': fill_green_indicator, 
+                      'sunday': fill_sunday_date, 'other_day': fill_other_day_date}
 
-    ws.insert_rows(1, amount=2)
-    ws.merge_cells(start_row=1, end_row=1, start_column=1, end_column=ws.max_column)
-    ws.cell(row=1, column=1, value=title_page).font=Font(name=conf['style_name'], bold=True, size=conf['size_name'])
-    ws.cell(row=1, column=1).alignment=Alignment(horizontal='center')
-    ws.row_dimensions[2].height = conf['distance_name']
+    # Apply row heights and general font/alignment for header and data rows
+    for row_idx in range(1, worksheet.max_row + 1):
+        row_dimension = worksheet.row_dimensions[row_idx]
+        # Determine row type based on modulo arithmetic (assuming 8-row pattern for each "block")
+        row_type_mod = row_idx % 8 
 
-    wb.save(file)
-    print(f"Formato aplicado exitosamente.") 
+        if row_type_mod == 0 or row_type_mod == 1: # Header rows in the pattern
+            row_dimension.height = config['row_headers']
+            if row_type_mod == 1: # Specific styling for the first header row of a block
+                for cell in worksheet[row_idx]:
+                    cell.font = Font(size=header_font_size_val, bold=True)
+                    cell.alignment = center_alignment
+        else: # Data rows in the pattern (2 through 7)
+            row_dimension.height = config['row_general']
+            for cell in worksheet[row_idx]:
+                cell.font = default_font_size # Apply default font size
+
+    # Apply column widths and specific alignments/fonts for different column types
+    for col_idx in range(1, worksheet.max_column + 1):
+        column_letter = get_column_letter(col_idx)
+        col_dimension = worksheet.column_dimensions[column_letter]
+        # Determine column type based on modulo arithmetic (assuming 5-column pattern for each "block")
+        col_type_mod = col_idx % 5
+
+        if col_type_mod == 1: # Index column
+            col_dimension.width = config['col_idx']
+            for cell in worksheet[column_letter]: # Iterate through cells in this column
+                cell.alignment = center_alignment
+        elif col_type_mod == 2: # Title column
+            col_dimension.width = config['col_title']
+        elif col_type_mod == 3 or col_type_mod == 4: # Number columns
+            col_dimension.width = config['col_numbers']
+            for cell in worksheet[column_letter]:
+                 # Make numbers bold if they are part of a header or already marked bold
+                is_bold = cell.font.bold or ( ( (cell.row % 8) == 1) and config.get('header_bold_numbers', True) )
+                cell.font = Font(size=header_font_size_val, bold=is_bold) 
+                cell.alignment = center_alignment
+        elif col_type_mod == 0: # Spacer column (if any)
+            col_dimension.width = config['col_space']
+    
+    # Apply specific styles (e.g., for 'new', 'transpose') from format_indices
+    for style_key, style_obj in cell_styles_map.items():
+        if style_key in format_indices:
+            for r_idx, c_idx in format_indices[style_key]:
+                # openpyxl is 1-indexed for rows/columns
+                worksheet.cell(row=r_idx + 1, column=c_idx + 1).font += style_obj
+
+    # Apply specific fills (e.g., for 'red', 'green', 'sunday') from format_indices
+    for fill_key, fill_obj in cell_fills_map.items():
+        if fill_key in format_indices:
+            for r_idx, c_idx in format_indices[fill_key]:
+                worksheet.cell(row=r_idx + 1, column=c_idx + 1).fill = fill_obj
+
+    # Insert rows at the top for the main page title
+    worksheet.insert_rows(1, amount=2)
+    # Merge cells for the title spanning the width of the table
+    worksheet.merge_cells(start_row=1, end_row=1, start_column=1, end_column=worksheet.max_column)
+    title_cell = worksheet.cell(row=1, column=1, value=page_title)
+    title_cell.font = Font(name=config['style_name'], bold=True, size=config['size_name'])
+    title_cell.alignment = Alignment(horizontal='center')
+    # Set height for the empty row below the title (as a spacer)
+    worksheet.row_dimensions[2].height = main_title_spacer_height
+
+    try:
+        workbook.save(excel_file_path)
+        logger.info(f"Formatting applied successfully to {excel_file_path}") # Replaced print
+    except IOError as e:
+        logger.error(f"Error saving the formatted Excel file '{excel_file_path}': {e}", exc_info=True) # Replaced print
+    except Exception as e: # Catch other openpyxl saving errors
+        logger.error(f"An unexpected error occurred while saving '{excel_file_path}': {e}", exc_info=True) # Replaced print
+
+    # The task was to "present" the file, which implied moving it.
+    # This function now focuses only on formatting and saving to a temp location.
+    # Moving the file should be handled by a separate function call in the main script if needed.
 
 def main():
+    # Example usage or testing can go here
+    # This would require sample DataFrames and a 'formatting.json' in 'configs/'
     pass
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     main()

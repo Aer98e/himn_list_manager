@@ -1,205 +1,342 @@
 import sqlite3
-from .file_names import R_BUSQUEDA
-from utils.helpers import limpiar_texto1
-from typing import Union
+from .file_names import R_BUSQUEDA # Retains original name, assuming it's a specific resource locator
+from utils.helpers import normalize_text # Changed from limpiar_texto1
+from typing import Union, Any, List, Tuple, Optional
 import os
+import sqlite3 # Ensure sqlite3 is imported for the module
+import logging
 
-def find_title(title_norm: str):
-    '''
-    Esta funcion recibe un titulo normalizado para buscar el titulo al que hace referencia dentro de la base de datos,
-    puede haber mas de un titulo normalizado referenciando a un solo titulo.
-    '''
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            '''
-            SELECT Himnos.titulo
-            FROM Himnos
-            JOIN Indice_busqueda ON Himnos.id=Indice_busqueda.id_himno
-            WHERE Indice_busqueda.titulo_norm = ?
-            ''',(title_norm,))
-        res = cursor.fetchone()
-    return res[0]
+# Get a logger for this module
+logger = logging.getLogger(__name__)
 
-def find_title_id(id_title: Union[int, list[int]]) -> list[str]:
-    def verification():
-        nonlocal id_title
-        if not isinstance(id_title, int) and not isinstance(id_title, list):
-            raise TypeError("El parametro debe ser de tipo Int o List")
-        
-        if isinstance(id_title, list):
-            for num in id_title:
-                if not isinstance(num, int):
-                    raise TypeError('El argumento id debe contener valores Int')
-        if isinstance(id_title, int):
-            id_title = [id_title]
-    
-    verification()
-
-    answer=[]
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
-        cursor = conn.cursor()
-        consult=', '.join(['?']*len(id_title))
-
-        for id_tit in id_title:
-            cursor.execute(f'SELECT titulo FROM Himnos WHERE id = ?', (id_tit,))
-            res = cursor.fetchone()
-            answer.append(res[0])
-    return answer
-
-
-def find_data(title_norm: str, queries: list):
-    '''
-    Permite busqueda general de alguna columna  basandose en un titulo normalizado.
-    La busqueda se dara en una base de datos especifica.
+# Helper function to execute queries, reducing redundancy
+def _execute_query(db_path_func: callable, query: str, params: Optional[tuple] = None,
+                   fetch_one: bool = False, fetch_all: bool = False, commit: bool = False) -> Any:
+    """
+    Executes a given SQL query against the database specified by db_path_func.
 
     Args:
-    title_norm (str) :Es el valor con el que se buscaran los datos.
-    queries (list[str]) : Es una lista de columnas de las que se retornara la busqueda.
-
-    '''
-    if not isinstance(queries, list):
-        raise ValueError('El argumento queries debe ser de tipo list')
-    
-    querie = ", ".join([f"Himnos.{que}" for que in queries])
-
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f'''
-            SELECT {querie}
-            FROM Himnos
-            JOIN Indice_busqueda ON Himnos.id=Indice_busqueda.id_himno
-            WHERE Indice_busqueda.titulo_norm = ?
-            ''',(title_norm,))
-        res = cursor.fetchone()
-    if len(queries)>1:
-        return res
-    return res[0]
-
-def update_search_list(title_norm:str, norm_match:str):
-    '''
-    Busca el id de un elemento para agregar otro con que use su misma clave foranea.
-
-    Parámetros:
-    title_norm (str): Elemento nuevo que se agregara a la base de datos.
-    norm_match (str): Elemento buscar el id que se agregará con nuevo elemento.
-    '''
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT id_himno FROM Indice_busqueda WHERE titulo_norm = ?', (norm_match,))
-        indice = cursor.fetchone()
-        if indice is not None:
-            cursor.execute('INSERT INTO Indice_busqueda(id_himno, titulo_norm) VALUES(?, ?)', (indice[0], title_norm))
-            conn.commit()
-        else:
-            print(f'No se encontro :: {norm_match} en la base de datos.')
-
-def Buscar_Columna(nameDB, nameTB, category):
-    """Este metodo se encarga de entregar una lista de todas las celdas de una columna de una base de datos.
-
-    Arg:
-        nameDB:     nombre de la base de datos a examinar.
-        nameTB:     noimbre de la tabla de la base de datso a examinar.
-        category:   nombre de la columna a registrar.
-    
-    """
-    with sqlite3.connect(nameDB) as conex:
-        cursor = conex.cursor()
-        consult = f'''
-        SELECT {category}
-        FROM {nameTB}
-        '''
-        cursor.execute(consult)
-        result = cursor.fetchall()
-    return [res[0] for res in result]
-
-def catch_normalize_titles():
-    '''
-    Busca en una base de datos especifica los registros de titulos normalizados.
-
-    Retorno:
-    (list)
-    '''
-
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-        '''
-        SELECT titulo_norm
-        FROM Indice_busqueda
-        ''')
-        result = cursor.fetchall()
-    return list(map(lambda x:x[0],result))
-
-def extract_data_db(title):
-    title_norm = limpiar_texto1(title)
-    
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT id_himno FROM Indice_busqueda WHERE titulo_norm = ?', (title_norm,))
-        result = cursor.fetchone()
-        
-        if result:
-            id_himno = result[0]
-            cursor.execute('''
-            SELECT titulo, numH_uso, numH_nuevo, es_nuevo, sube_tono, id_himnario
-            FROM Himnos
-            WHERE id = ?
-            ''', (id_himno,))
-            result = cursor.fetchone()
-            
-        else:
-            print(f'No se encontró el himno: {title}')
-            return None
-        
-        title = result[0]
-        num_B_P = result[1]
-        num_N = str(result[2])
-        new_H = result[3]
-        up = result[4]
-
-        if new_H:
-            num_N+='::N'
-        if up:
-            num_N+='::U'
-        
-        if num_B_P and result[5] == 1:
-            num_B_P = f'{num_B_P}::R'
-        elif result[5] == 2:
-            num_B_P = f'{num_B_P}::V'
-        
-        return[title, num_B_P, num_N]
-
-def load_frequencies():
-    '''
-    Toma una base de datos especifica de la que extrae regustros de la frecuencia de uso de los himnos.
+        db_path_func (callable): A function that returns the database file path (e.g., R_BUSQUEDA).
+        query (str): The SQL query to execute.
+        params (Optional[tuple]): Parameters to substitute into the query. Defaults to None.
+        fetch_one (bool): If True, fetches one row.
+        fetch_all (bool): If True, fetches all rows.
+        commit (bool): If True, commits the transaction (for INSERT, UPDATE, DELETE).
 
     Returns:
-        list: Una lista con tuplas que contiene el id del himno, con su frecuencia util, y frecuencia real.
-    '''
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
+        Any: The result of the query (single row, all rows, or None).
+
+    Raises:
+        ValueError: If both fetch_one and fetch_all are True.
+    """
+    if fetch_one and fetch_all:
+        raise ValueError("Cannot set both fetch_one and fetch_all to True.")
+    
+    db_path = db_path_func() # Get the database path
+    conn = None # Initialize conn to None
+    try:
+        conn = sqlite3.connect(db_path)
+        # Set timeout to prevent 'database is locked' errors for concurrent access if it becomes an issue.
+        # conn.timeout = 10 # 10 seconds, adjust as needed. Not strictly necessary for single-threaded app.
         cursor = conn.cursor()
-        cursor.execute('''
+        cursor.execute(query, params or ())
+
+        if commit:
+            conn.commit()
+
+        if fetch_one:
+            return cursor.fetchone()
+        if fetch_all:
+            return cursor.fetchall()
+        return None # For operations like INSERT/UPDATE without fetch, or if no fetch type specified
+    except sqlite3.OperationalError as e:
+        # Handles errors like "database is locked", "no such table", "database disk image is malformed"
+        logger.error(f"SQLite OperationalError in _execute_query (DB: {db_path}, Query: {query}): {e}", exc_info=True) # Replaced print
+        return None # Or an empty list if fetch_all was expected by caller
+    except sqlite3.IntegrityError as e:
+        # Handles errors like "UNIQUE constraint failed"
+        logger.error(f"SQLite IntegrityError in _execute_query (DB: {db_path}, Query: {query}): {e}", exc_info=True) # Replaced print
+        raise # Re-raising might be appropriate if the caller needs to know about constraint violations
+    except sqlite3.Error as e: # Catch other sqlite3 related errors
+        logger.error(f"An unexpected SQLite error occurred in _execute_query (DB: {db_path}, Query: {query}): {e}", exc_info=True) # Replaced print
+        return None # Or an empty list
+    finally:
+        if conn:
+            conn.close()
+
+
+def find_title_by_normalized_text(normalized_title: str) -> Optional[str]:
+    '''
+    Retrieves the original hymn title corresponding to a given normalized title.
+    Multiple normalized titles can reference a single original title.
+
+    Args:
+        normalized_title (str): The normalized title to search for.
+
+    Returns:
+        Optional[str]: The original hymn title if found, otherwise None.
+    '''
+    query = """
+        SELECT H.titulo
+        FROM Himnos H
+        JOIN Indice_busqueda IB ON H.id = IB.id_himno
+        WHERE IB.titulo_norm = ?
+    """
+    result = _execute_query(R_BUSQUEDA, query, params=(normalized_title,), fetch_one=True)
+    return result[0] if result else None
+
+def find_titles_by_ids(title_ids: Union[int, List[int]]) -> List[str]:
+    """
+    Retrieves hymn titles for a given ID or list of IDs.
+
+    Args:
+        title_ids (Union[int, List[int]]): A single hymn ID or a list of hymn IDs.
+
+    Returns:
+        List[str]: A list of hymn titles corresponding to the given IDs.
+
+    Raises:
+        TypeError: If title_ids is not an int or a list of ints.
+    """
+    if isinstance(title_ids, int):
+        ids_to_query = [title_ids]
+    elif isinstance(title_ids, list):
+        if not all(isinstance(item, int) for item in title_ids):
+            raise TypeError('All elements in title_ids list must be integers.')
+        ids_to_query = title_ids
+    else:
+        raise TypeError("title_ids must be an integer or a list of integers.")
+
+    if not ids_to_query:
+        return []
+
+    # Using a placeholder for each ID to prevent SQL injection, though less critical for IDs.
+    # However, _execute_query currently only supports a single param tuple for execute.
+    # For multiple IDs, we might need to adjust _execute_query or call it multiple times.
+    # For simplicity here, calling it multiple times, which is less efficient for many IDs.
+    titles = []
+    for title_id in ids_to_query:
+        query = 'SELECT titulo FROM Himnos WHERE id = ?'
+        result = _execute_query(R_BUSQUEDA, query, params=(title_id,), fetch_one=True)
+        if result:
+            titles.append(result[0])
+    return titles
+
+
+def find_data_by_normalized_title(normalized_title: str, columns_to_fetch: List[str]) -> Optional[Union[tuple, Any]]:
+    '''
+    Performs a general search for specified columns based on a normalized title.
+
+    Args:
+        normalized_title (str): The normalized title to search by.
+        columns_to_fetch (List[str]): A list of column names from the 'Himnos' table to retrieve.
+
+    Returns:
+        Optional[Union[tuple, Any]]: A tuple of the fetched data if multiple columns are requested,
+                                     a single value if one column is requested, or None if not found.
+    Raises:
+        ValueError: If columns_to_fetch is not a list or is empty.
+    '''
+    if not isinstance(columns_to_fetch, list) or not columns_to_fetch:
+        raise ValueError('columns_to_fetch must be a non-empty list of column names.')
+    
+    # SECURITY NOTE: columns_to_fetch are directly embedded into the SQL query.
+    # This is safe if columns_to_fetch comes from a trusted source (e.g., hardcoded list).
+    # If columns_to_fetch could be influenced by external input, it MUST be validated
+    # against a whitelist of allowed column names to prevent SQL injection.
+    select_columns = ", ".join([f"H.{col}" for col in columns_to_fetch])
+    query = f"""
+        SELECT {select_columns}
+        FROM Himnos H
+        JOIN Indice_busqueda IB ON H.id = IB.id_himno
+        WHERE IB.titulo_norm = ?
+    """
+    result = _execute_query(R_BUSQUEDA, query, params=(normalized_title,), fetch_one=True)
+
+    if result:
+        return result if len(columns_to_fetch) > 1 else result[0]
+    return None
+
+def add_to_search_index(new_normalized_title: str, existing_normalized_title_match: str):
+    '''
+    Adds a new normalized title to the search index, linking it to the same hymn ID
+    as an existing normalized title.
+
+    Args:
+        new_normalized_title (str): The new normalized title to add.
+        existing_normalized_title_match (str): An existing normalized title whose hymn ID will be used.
+    '''
+    # First, get the hymn_id from the existing normalized title
+    id_query = 'SELECT id_himno FROM Indice_busqueda WHERE titulo_norm = ?'
+    result = _execute_query(R_BUSQUEDA, id_query, params=(existing_normalized_title_match,), fetch_one=True)
+
+    if result:
+        hymn_id = result[0]
+        # Insert the new normalized title with the fetched hymn_id
+        insert_query = 'INSERT INTO Indice_busqueda (id_himno, titulo_norm) VALUES (?, ?)'
+        _execute_query(R_BUSQUEDA, insert_query, params=(hymn_id, new_normalized_title), commit=True)
+    else:
+        logger.warning(f'Could not find hymn ID for :: {existing_normalized_title_match} in the database to add new title.') # Replaced print
+
+
+def get_column_values(db_name_func: callable, table_name: str, column_name: str) -> List[Any]:
+    """
+    Retrieves all values from a specific column in a given table and database.
+
+    Args:
+        db_name_func (callable): Function that returns the path to the database (e.g., R_BUSQUEDA).
+        table_name (str): The name of the table to query.
+        column_name (str): The name of the column from which to fetch values.
+
+    Returns:
+        List[Any]: A list of values from the specified column.
+    """
+    # SECURITY NOTE: table_name and column_name are directly embedded into the SQL query.
+    # This is safe if these names come from a trusted, controlled source (e.g., hardcoded values,
+    # internal mappings). If table_name or column_name could be influenced by any external input,
+    # they MUST be validated against a whitelist of allowed table/column names to prevent SQL injection.
+    query = f"SELECT {column_name} FROM {table_name}"
+    results = _execute_query(db_name_func, query, fetch_all=True)
+    return [row[0] for row in results if row] if results else []
+
+def get_all_normalized_titles() -> List[str]:
+    '''
+    Fetches all recorded normalized titles from the search index database.
+
+    Returns:
+        List[str]: A list of all normalized titles.
+    '''
+    query = 'SELECT titulo_norm FROM Indice_busqueda'
+    results = _execute_query(R_BUSQUEDA, query, fetch_all=True)
+    return [row[0] for row in results if row] if results else []
+
+
+def extract_hymn_data_for_display(title: str) -> Optional[List[str]]:
+    """
+    Extracts and formats hymn data for display purposes based on the original title.
+    This involves normalizing the title, finding its ID, and then retrieving
+    associated data, applying specific formatting rules.
+
+    Args:
+        title (str): The original hymn title.
+
+    Returns:
+        Optional[List[str]]: A list containing formatted [title, usage_number, new_number_indicator],
+                             or None if the hymn is not found.
+    """
+    normalized_title = normalize_text(title)
+    
+    # Get hymn_id using the normalized title
+    id_query = 'SELECT id_himno FROM Indice_busqueda WHERE titulo_norm = ?'
+    id_result = _execute_query(R_BUSQUEDA, id_query, params=(normalized_title,), fetch_one=True)
+    
+    if not id_result:
+        logger.warning(f'Hymn not found for display: {title} (Normalized: {normalized_title})') # Replaced print
+        return None
+        
+    hymn_id = id_result[0]
+    
+    # Get hymn details
+    details_query = """
+        SELECT titulo, numH_uso, numH_nuevo, es_nuevo, sube_tono, id_himnario
+        FROM Himnos
+        WHERE id = ?
+    """
+    data_result = _execute_query(R_BUSQUEDA, details_query, params=(hymn_id,), fetch_one=True)
+
+    if not data_result:
+        # This case should ideally not happen if id_result was successful, implies data inconsistency
+        logger.error(f'Hymn data not found for ID: {hymn_id} (Title: {title}) though ID was found via normalized title.') # Replaced print
+        return None
+        
+    original_title, usage_hymn_num, new_hymn_num, is_new_hymn, transpose_up, hymnary_id = data_result
+    
+    # Format new hymn number string
+    new_hymn_num_str = str(new_hymn_num) if new_hymn_num is not None else ""
+    if is_new_hymn: # es_nuevo
+        new_hymn_num_str += '::N'
+    if transpose_up: # sube_tono
+        new_hymn_num_str += '::U'
+    
+    # Format usage hymn number string based on hymnary_id
+    usage_hymn_num_str = str(usage_hymn_num) if usage_hymn_num is not None else ""
+    if usage_hymn_num: # Only add suffix if num_B_P exists
+        if hymnary_id == 1: # Himnario de Papel (Paper Hymnal)
+            usage_hymn_num_str += '::R' # Red book indicator
+        elif hymnary_id == 2: # Himnario Nuevo (New Hymnal)
+            usage_hymn_num_str += '::V' # Green book indicator (assuming V stands for Verde/Green)
+        
+    return [original_title, usage_hymn_num_str, new_hymn_num_str]
+
+def load_tracked_hymn_frequencies() -> List[Tuple[int, int, int]]:
+    '''
+    Loads hymn frequencies for hymns that are marked for tracking.
+
+    Returns:
+        List[Tuple[int, int, int]]: A list of tuples, where each tuple contains
+                                     (hymn_id, useful_frequency, real_frequency).
+    '''
+    query = """
         SELECT id_himno, frec_util, frec_real
         FROM Frecuencias
-        WHERE seguimiento = 1
-        ''')
-        result = cursor.fetchall()
-    return result
+        WHERE seguimiento = 1 
+    """ # seguimiento = 1 means tracking is enabled
+    return _execute_query(R_BUSQUEDA, query, fetch_all=True) or []
 
-def database_update(data_update):
-    with sqlite3.connect(R_BUSQUEDA()) as conn:
+
+def update_hymn_frequencies_in_db(frequency_data_updates: List[Tuple[int, int, int]]):
+    """
+    Updates hymn frequencies in the database.
+
+    Args:
+        frequency_data_updates (List[Tuple[int, int, int]]): A list of tuples,
+            where each tuple is (new_useful_frequency, new_real_frequency, hymn_id).
+            Note the order for executemany.
+    """
+    if not frequency_data_updates:
+        return
+
+    query = """
+        UPDATE Frecuencias
+        SET frec_util = ?, frec_real = ?
+        WHERE id_himno = ?
+    """
+    # For executemany, the _execute_query helper is not directly used as it's designed for single executions.
+    # Direct sqlite3 usage is appropriate here.
+    db_path = R_BUSQUEDA()
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.executemany('''
-            UPDATE Frecuencias
-            SET frec_util = ?, frec_real = ?
-            WHERE id_himno = ?
-        ''', data_update)
-        conn.commit() 
+        cursor.executemany(query, frequency_data_updates)
+        conn.commit()
+    except sqlite3.Error as e:
+        logger.error(f"SQLite error during bulk update_hymn_frequencies_in_db (DB: {db_path}): {e}", exc_info=True) # Replaced print
+        # Log error, potentially raise a custom exception or handle
+    finally:
+        if conn:
+            conn.close()
 
 def main():
+    # Example usage or testing can go here
+    # Test find_title_by_normalized_text
+    # title = find_title_by_normalized_text("a dios sea gloria")
+    # print(f"Found title: {title}")
+
+    # Test find_titles_by_ids
+    # titles_single = find_titles_by_ids(1)
+    # print(f"Titles for ID 1: {titles_single}")
+    # titles_multiple = find_titles_by_ids([1, 2, 3])
+    # print(f"Titles for IDs 1,2,3: {titles_multiple}")
+
+    # Test get_all_normalized_titles
+    # all_norm_titles = get_all_normalized_titles()
+    # print(f"All normalized titles count: {len(all_norm_titles)}")
+
+    # Test extract_hymn_data_for_display
+    # hymn_display_data = extract_hymn_data_for_display("A DIOS SEA GLORIA") # Use an actual title from your DB
+    # print(f"Display data for 'A DIOS SEA GLORIA': {hymn_display_data}")
     pass
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     main()

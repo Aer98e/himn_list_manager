@@ -92,6 +92,7 @@ def identify_and_display_hymn_duplications(hymn_frequencies: Dict[int, Dict[str,
         bool: True if duplications were found, False otherwise.
     """
     if not isinstance(hymn_frequencies, dict):
+        logger.critical("The 'hymn_frequencies' argument must be a dictionary.")
         raise ValueError("The 'hymn_frequencies' argument must be a dictionary.")
     
     def _display_duplication_info_on_console(duplication_list: List[Dict[str, Any]]):
@@ -213,7 +214,7 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
     Provides an interactive console interface for analyzing hymn usage patterns.
     Allows users to view:
         1. Hymns used in the current sheet that were also used in the last >=2 sheets.
-        2. Hymns NOT used in the current sheet but were used in the previous sheet.
+        2. Hymns NOT used in the current sheet and the previous sheet.
         3. Least frequently used hymns overall.
     The user can choose to re-process the current sheet (returns True) or continue (returns False).
 
@@ -227,6 +228,7 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
         TypeError: If `hymn_ids_in_current_sheet` is not a set.
     """
     if not isinstance(hymn_ids_in_current_sheet, set):
+        logger.critical('The input `hymn_ids_in_current_sheet` must be a Set.')
         raise TypeError('The input `hymn_ids_in_current_sheet` must be a Set.')
     
     def display_analysis_menu():
@@ -235,7 +237,7 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
         else: os.system('clear')
         logger.info("================== Asistente de Análisis de Uso de Himnos ==================\n")
         logger.info("\t1) Mostrar himnos usados recientemente y también en esta hoja.")
-        logger.info("\t2) Mostrar himnos usados en la(s) última(s) hoja(s) pero NO en esta.")
+        logger.info("\t2) Mostrar himnos NO usados en la(s) última(s) hoja(s) INCLUIDA esta.")
         logger.info("\t3) Mostrar himnos menos usados en general.")
         logger.info("\t4) Re-procesar la hoja actual (ej. después de corrección manual de datos).")
         logger.info("\t5) Continuar con la ejecución del programa.")
@@ -292,7 +294,7 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
 
     # Prepare data for "Used Last Sheet but Not Current"
     # Hymns NOT in current sheet AND have useful_freq < 0 (meaning not used in this one, maybe others before)
-    # Specifically, useful_freq == -1 would mean used in the one just before this, but not this.
+    # Specifically, useful_freq == -1 would mean not used in the one just before this, include this.
     # useful_freq < 1 (i.e. 0 or negative) means not used in the *immediately* preceding recorded period for sure.
     ids_not_in_sheet_but_used_before = [
         h_id for h_id in db_freq_dict 
@@ -312,7 +314,7 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
             report_data_to_show.sort(key=lambda x: x[1], reverse=True)
             report_type = "recently_used"
             
-        elif user_choice == '2': # Used last sheet(s) but not this one
+        elif user_choice == '2': # Not used last sheet(s) and not this one
             titles = find_titles_by_ids(ids_not_in_sheet_but_used_before)
             report_data_to_show = list(zip(titles, useful_freq_for_not_used))
             # Sort by useful frequency, ascending (most "missed" first, i.e., more negative)
@@ -341,13 +343,3 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
         
         display_analysis_results(report_data_to_show, report_type)
         input('\nPresione Enter para volver al menú de análisis...')
-   
-# Comments from original code that might be relevant or can be discarded:
-# -Mostrar que himnos estoy usando y ya he usado en las dos ultimas hojas/podriamos_
-# tener prioridad en los himnos que se repiten mas de una vez en la hoja actual.
-# (Show hymns I'm using that I've also used in the last two sheets / we could prioritize hymns repeated in the current sheet.)
-# -Mostrar que himnos no he usado desde la anterior vez.
-# (Show hymns I haven't used since the last time.)
-# -Mostrar himnos por debajo del promedio(no usados).
-# (Show hymns below average usage / not used.)
-# These seem to be initial thoughts for the analysis assistant's features.

@@ -102,8 +102,8 @@ def select_excel_file(initialdir: Optional[str] = None, show_selected_path_in_co
         str: The full path of the selected Excel file. Returns an empty string if cancelled.
     """
     # Hide the root Tkinter window as it's not needed for just a dialog
-    root = tk.Tk()
-    root.withdraw()
+    # root = tk.Tk()
+    # root.withdraw()
     
     file_path = filedialog.askopenfilename(
         title="Seleccionar archivo Excel para procesar", # Translated to Spanish
@@ -130,8 +130,8 @@ def get_save_excel_file_path(initialdir: Optional[str] = None, show_selected_pat
         str: The full path where the file should be saved. Returns an empty string if cancelled.
     """
     # Hide the root Tkinter window
-    root = tk.Tk()
-    root.withdraw()
+    # root = tk.Tk()
+    # root.withdraw()
     
     file_path = filedialog.asksaveasfilename(
         title="Guardar archivo como...", # Translated to Spanish

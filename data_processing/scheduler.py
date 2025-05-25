@@ -2,6 +2,7 @@ import re
 import datetime
 from typing import List, Optional, Any # For type hinting
 import pandas as pd # For type hinting DataFrames
+import logging
 
 # Constants for accessing date elements in DataFrames
 DATE_ROW_INDEX = 0
@@ -10,6 +11,8 @@ DATE_COLUMN_INDEX = 1
 # Weekday names in Spanish, as used by the original get_text_day function.
 # Consider localizing or making this configurable if supporting multiple languages.
 WEEKDAY_NAMES_ES = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO']
+
+logger=logging.getLogger(__name__)
 
 def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int] = None, year: Optional[int] = None) -> List[Optional[str]]:    
     """
@@ -41,7 +44,8 @@ def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int
                 day_numbers.append(int(match.group(0)))
             else:
                 # Log or handle cases where day number cannot be extracted
-                print(f'Could not extract day number from string: {date_cell_value}')
+                logger.error(f"Uno de los frames no contenia un numero, por defecto se usará 0. ({date_cell_value})")
+                day_numbers.append(0)
                 # Consider raising a ValueError or appending a placeholder if critical
         return day_numbers
 
@@ -66,7 +70,7 @@ def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int
             event_date = datetime.date(effective_year, effective_month, day_num)
         except ValueError as e:
             # Handle invalid dates (e.g., February 30th)
-            print(f"Invalid date created for day {day_num}, month {effective_month}, year {effective_year}: {e}")
+            logger.error(f"Invalid date created for day {day_num}, month {effective_month}, year {effective_year}: {e}")
             schedule_date_texts.append(None) # Or some other error indicator
             continue
 
@@ -109,13 +113,14 @@ def filter_data_frames_by_date(data_frames: List[pd.DataFrame], schedule_dates: 
         and aligns with the `data_frames` list.
     """
     if len(data_frames) != len(schedule_dates):
+        logger.critical("The length of data_frames and schedule_dates lists must be identical.")
         raise ValueError("The length of data_frames and schedule_dates lists must be identical.")
 
     filtered_data_frames = []
     for i, frame in enumerate(data_frames):
         if schedule_dates[i] is None: # Skip if the date was filtered out (e.g., past date)
             continue
-        
+        #=====================================================================================PIENSO QUE PODEMOS USAR SOLO NUMEROS O LISTA DE BOOL, PARA NO TENER QUE PASAR LOS DATAFRAMES COMO RETURN
         # Create a copy to avoid modifying the original DataFrame in the input list
         updated_frame = frame.copy()
         # Update the date cell with the new formatted schedule date string

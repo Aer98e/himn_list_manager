@@ -120,6 +120,10 @@ def find_titles_by_ids(title_ids: Union[int, List[int]]) -> List[str]:
         result = _execute_query(R_BUSQUEDA, query, params=(title_id,), fetch_one=True)
         if result:
             titles.append(result[0])
+
+        else:
+            logger.critical("Un himno no se encontro en la base de datos, esto rompe la presentacion de frecuencias.")
+            raise ValueError("Un himno no se encontro en la base de datos, esto rompe la presentacion de frecuencias.")
     return titles
 
 
@@ -140,7 +144,7 @@ def find_data_by_normalized_title(normalized_title: str, columns_to_fetch: List[
     if not isinstance(columns_to_fetch, list) or not columns_to_fetch:
         raise ValueError('columns_to_fetch must be a non-empty list of column names.')
     
-    # SECURITY NOTE: columns_to_fetch are directly embedded into the SQL query.
+    # SECURITY N0TE: columns_to_fetch are directly embedded into the SQL query.
     # This is safe if columns_to_fetch comes from a trusted source (e.g., hardcoded list).
     # If columns_to_fetch could be influenced by external input, it MUST be validated
     # against a whitelist of allowed column names to prevent SQL injection.
@@ -206,9 +210,12 @@ def get_all_normalized_titles() -> List[str]:
     Returns:
         List[str]: A list of all normalized titles.
     '''
-    query = 'SELECT titulo_norm FROM Indice_busqueda'
-    results = _execute_query(R_BUSQUEDA, query, fetch_all=True)
-    return [row[0] for row in results if row] if results else []
+    # query = 'SELECT titulo_norm FROM Indice_busqueda'
+    # results = _execute_query(R_BUSQUEDA, query, fetch_all=True)
+
+    # return [row[0] for row in results if row] if results else []
+    results = get_column_values(R_BUSQUEDA, "Indice_busqueda", "titulo_norm")
+    return results
 
 
 def extract_hymn_data_for_display(title: str) -> Optional[List[str]]:
@@ -261,9 +268,9 @@ def extract_hymn_data_for_display(title: str) -> Optional[List[str]]:
     # Format usage hymn number string based on hymnary_id
     usage_hymn_num_str = str(usage_hymn_num) if usage_hymn_num is not None else ""
     if usage_hymn_num: # Only add suffix if num_B_P exists
-        if hymnary_id == 1: # Himnario de Papel (Paper Hymnal)
+        if hymnary_id == 1: # Himnario de Bautista (Baptist Hymnal)
             usage_hymn_num_str += '::R' # Red book indicator
-        elif hymnary_id == 2: # Himnario Nuevo (New Hymnal)
+        elif hymnary_id == 2: # Himnario Popular (Popular Hymnal)
             usage_hymn_num_str += '::V' # Green book indicator (assuming V stands for Verde/Green)
         
     return [original_title, usage_hymn_num_str, new_hymn_num_str]

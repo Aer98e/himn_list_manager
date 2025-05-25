@@ -212,22 +212,23 @@ def apply_excel_formatting(master_df: pd.DataFrame, page_title: str, temp_dir: s
         fill_sunday_date = PatternFill(start_color=config.get('fill_sunday', 'FFFFFF'), end_color=config.get('fill_sunday', 'FFFFFF'), fill_type="solid")
         fill_other_day_date = PatternFill(start_color=config.get('fill_other_day', 'FFFFFF'), end_color=config.get('fill_other_day', 'FFFFFF'), fill_type="solid")
         
-        default_font_size_val = config.get('general_size', 11) # Default font size
+        default_font_size_val: int = config.get('general_size', 11) # Default font size
         default_font_size = Font(size=default_font_size_val)
-        header_font_size_val = config.get('header_size', 12) # Default header font size
+        header_font_size_val: int = config.get('header_size', 12) # Default header font size
         
         # For keys that are essential for structure, direct access might be okay,
         # or check with .get() and raise a more specific error if not found.
-        row_headers_height = config['row_headers']
-        row_general_height = config['row_general']
-        col_idx_width = config['col_idx']
-        col_title_width = config['col_title']
-        col_numbers_width = config['col_numbers']
-        col_space_width = config.get('col_space', 5) # Optional spacer column
+        row_headers_height: int = config.get('row_headers', 18.5)
+        row_general_height: int = config.get('row_general', 16)
+        col_idx_width: int = config.get('col_idx',3)
+        col_title_width: int = config.get('col_title', 32)
+        col_numbers_width: int = config.get('col_numbers', 4.5)
+        col_space_width: int = config.get('col_space', 5) # Optional spacer column
         
-        main_title_font_name = config.get('style_name', 'Arial')
-        main_title_font_size = config.get('size_name', 16)
-        main_title_spacer_height = config.get('distance_name', 10)
+        main_title_font_name: str = config.get('style_name', 'Arial')
+        main_title_font_size: int = config.get('size_name', 16)
+        style_main_title:str = Font(name=main_title_font_name, bold=True, size=main_title_font_size)
+        main_title_spacer_height: int = config.get('distance_name', 10)
 
     except KeyError as e:
         logger.error(f"Critical key missing in 'formatting.json': {e}. Cannot apply formatting.", exc_info=True) # Replaced print
@@ -239,16 +240,16 @@ def apply_excel_formatting(master_df: pd.DataFrame, page_title: str, temp_dir: s
     center_alignment = Alignment(horizontal='center')
     
     # Define styles and fills based on configuration
-    style_new_hymn = Font(bold=True, color=config['cl_new'])
-    style_transposed_hymn = Font(bold=True, color=config['cl_transpose'])
-    fill_red_indicator = PatternFill(start_color=config['fill_red'], end_color=config['fill_red'], fill_type="solid")
-    fill_green_indicator = PatternFill(start_color=config['fill_green'], end_color=config['fill_green'], fill_type="solid")
-    fill_sunday_date = PatternFill(start_color=config['fill_sunday'], end_color=config['fill_sunday'], fill_type="solid")
-    fill_other_day_date = PatternFill(start_color=config['fill_other_day'], end_color=config['fill_other_day'], fill_type="solid")
-    center_alignment = Alignment(horizontal='center')
+    # style_new_hymn = Font(bold=True, color=config['cl_new'])
+    # style_transposed_hymn = Font(bold=True, color=config['cl_transpose'])
+    # fill_red_indicator = PatternFill(start_color=config['fill_red'], end_color=config['fill_red'], fill_type="solid")
+    # fill_green_indicator = PatternFill(start_color=config['fill_green'], end_color=config['fill_green'], fill_type="solid")
+    # fill_sunday_date = PatternFill(start_color=config['fill_sunday'], end_color=config['fill_sunday'], fill_type="solid")
+    # fill_other_day_date = PatternFill(start_color=config['fill_other_day'], end_color=config['fill_other_day'], fill_type="solid")
+    # center_alignment = Alignment(horizontal='center')
 
-    default_font_size = Font(size=config['general_size'])
-    header_font_size_val = config['header_size'] # Assuming this is just the size, not a Font object
+    # default_font_size = Font(size=config['general_size'])
+    # header_font_size_val = config['header_size'] # Assuming this is just the size, not a Font object
 
     # Map configuration keys to actual style objects for easier lookup
     cell_styles_map = {'new': style_new_hymn, 'transpose': style_transposed_hymn}
@@ -262,13 +263,13 @@ def apply_excel_formatting(master_df: pd.DataFrame, page_title: str, temp_dir: s
         row_type_mod = row_idx % 8 
 
         if row_type_mod == 0 or row_type_mod == 1: # Header rows in the pattern
-            row_dimension.height = config['row_headers']
+            row_dimension.height = row_headers_height
             if row_type_mod == 1: # Specific styling for the first header row of a block
                 for cell in worksheet[row_idx]:
                     cell.font = Font(size=header_font_size_val, bold=True)
                     cell.alignment = center_alignment
         else: # Data rows in the pattern (2 through 7)
-            row_dimension.height = config['row_general']
+            row_dimension.height = row_general_height
             for cell in worksheet[row_idx]:
                 cell.font = default_font_size # Apply default font size
 
@@ -280,20 +281,20 @@ def apply_excel_formatting(master_df: pd.DataFrame, page_title: str, temp_dir: s
         col_type_mod = col_idx % 5
 
         if col_type_mod == 1: # Index column
-            col_dimension.width = config['col_idx']
+            col_dimension.width = col_idx_width
             for cell in worksheet[column_letter]: # Iterate through cells in this column
                 cell.alignment = center_alignment
         elif col_type_mod == 2: # Title column
-            col_dimension.width = config['col_title']
+            col_dimension.width = col_title_width
         elif col_type_mod == 3 or col_type_mod == 4: # Number columns
-            col_dimension.width = config['col_numbers']
+            col_dimension.width = col_numbers_width
             for cell in worksheet[column_letter]:
                  # Make numbers bold if they are part of a header or already marked bold
                 is_bold = cell.font.bold or ( ( (cell.row % 8) == 1) and config.get('header_bold_numbers', True) )
                 cell.font = Font(size=header_font_size_val, bold=is_bold) 
                 cell.alignment = center_alignment
         elif col_type_mod == 0: # Spacer column (if any)
-            col_dimension.width = config['col_space']
+            col_dimension.width = col_space_width
     
     # Apply specific styles (e.g., for 'new', 'transpose') from format_indices
     for style_key, style_obj in cell_styles_map.items():
@@ -313,8 +314,8 @@ def apply_excel_formatting(master_df: pd.DataFrame, page_title: str, temp_dir: s
     # Merge cells for the title spanning the width of the table
     worksheet.merge_cells(start_row=1, end_row=1, start_column=1, end_column=worksheet.max_column)
     title_cell = worksheet.cell(row=1, column=1, value=page_title)
-    title_cell.font = Font(name=config['style_name'], bold=True, size=config['size_name'])
-    title_cell.alignment = Alignment(horizontal='center')
+    title_cell.font = style_main_title
+    title_cell.alignment = center_alignment
     # Set height for the empty row below the title (as a spacer)
     worksheet.row_dimensions[2].height = main_title_spacer_height
 

@@ -101,14 +101,14 @@ def identify_and_display_hymn_duplications(hymn_frequencies: Dict[int, Dict[str,
             os.system('cls')
         else: # For Linux/MacOS
             os.system('clear')
-        
-        logger.info("\n====================== HIMNOS DUPLICADOS ENCONTRADOS ======================\n")
+        logger.debug(f'Se encontraron duplicaciones: {duplication_list}')
+        print("\n====================== HIMNOS DUPLICADOS ENCONTRADOS ======================\n")
         for hymn_entry in duplication_list:
-            logger.info(f"El himno '{hymn_entry['title']}' (ID: {hymn_entry['id']}) se usa {hymn_entry['times_used']} veces en estas fechas:")
+            print(f"El himno '{hymn_entry['title']}' (ID: {hymn_entry['id']}) se usa {hymn_entry['times_used']} veces en estas fechas:")
             for date_str in hymn_entry['dates']:
-                logger.info(f"   - {date_str}")
-            logger.info("_________________________________________________________________")
-        logger.info('\n=======================================================================')
+                print(f"   - {date_str}")
+            print("_________________________________________________________________")
+        print('\n=======================================================================')
         input('Presione Enter para continuar...') # Translated
 
     found_duplications = False
@@ -235,46 +235,46 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
         """Prints the analysis options menu to the console."""
         if os.name == 'nt': os.system('cls')
         else: os.system('clear')
-        logger.info("================== Asistente de Análisis de Uso de Himnos ==================\n")
-        logger.info("\t1) Mostrar himnos usados recientemente y también en esta hoja.")
-        logger.info("\t2) Mostrar himnos NO usados en la(s) última(s) hoja(s) INCLUIDA esta.")
-        logger.info("\t3) Mostrar himnos menos usados en general.")
-        logger.info("\t4) Re-procesar la hoja actual (ej. después de corrección manual de datos).")
-        logger.info("\t5) Continuar con la ejecución del programa.")
-        logger.info("____________________________________________________________________")
+        print("================== Asistente de Análisis de Uso de Himnos ==================\n")
+        print("\t1) Mostrar himnos usados recientemente y también en esta hoja.")
+        print("\t2) Mostrar himnos NO usados en la(s) última(s) hoja(s) INCLUIDA esta.")
+        print("\t3) Mostrar himnos menos usados en general.")
+        print("\t4) Re-procesar la hoja actual (ej. después de corrección manual de datos).")
+        print("\t5) Continuar con la ejecución del programa.")
+        print("____________________________________________________________________")
         user_choice = input('Ingrese el número de su opción: ').strip()
         return user_choice
 
     def display_analysis_results(results_list: List[Tuple[str, int]], report_type: str):
         """Formats and prints the analysis results."""
         if not results_list:
-            logger.info("\nNo se encontraron himnos que coincidan con sus criterios para este informe.")
-            logger.info("===============================================================")
+            print("\nNo se encontraron himnos que coincidan con sus criterios para este informe.")
+            print("===============================================================")
             return
         
-        logger.info("\n======================== Resultados del Análisis =========================")
+        print("\n======================== Resultados del Análisis =========================")
         if report_type == "recently_used" or report_type == "not_used_recently":
             current_group_val = results_list[0][1] 
             if current_group_val > 0:
-                logger.info(f'\n==== Usado en las Últimas {current_group_val} Hoja(s) ====')
+                print(f'\n==== Usado en las Últimas {current_group_val} Hoja(s) ====')
             else:
-                 logger.info(f'\n==== No Usado Durante las Últimas {abs(current_group_val)} Hoja(s) ====')
+                 print(f'\n==== No Usado Durante las Últimas {abs(current_group_val)} Hoja(s) ====')
 
             for i, (title, value) in enumerate(results_list):
                 if value != current_group_val:
                     current_group_val = value
                     if current_group_val > 0:
-                        logger.info(f'\n==== Usado en las Últimas {current_group_val} Hoja(s) ====')
+                        print(f'\n==== Usado en las Últimas {current_group_val} Hoja(s) ====')
                     else:
-                        logger.info(f'\n==== No Usado Durante las Últimas {abs(current_group_val)} Hoja(s) ====')
-                logger.info(f'{i+1}. {title} (Factor de Uso: {value})')
+                        print(f'\n==== No Usado Durante las Últimas {abs(current_group_val)} Hoja(s) ====')
+                print(f'{i+1}. {title} (Factor de Uso: {value})')
         
         elif report_type == "least_used":
-            logger.info(f'\n==== Conteo General de Uso ====')
+            print(f'\n==== Conteo General de Uso ====')
             for i, (title, value) in enumerate(results_list):
-                logger.info(f'{i+1}. {title} (Total de Veces Usado: {value})')
+                print(f'{i+1}. {title} (Total de Veces Usado: {value})')
                 
-        logger.info("===============================================================")
+        print("===============================================================")
 
     # Load all tracked hymn frequencies from DB
     db_frequencies = load_tracked_hymn_frequencies() # Returns list of (id, useful_freq, real_freq)
@@ -337,7 +337,8 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
             return False # Signal to the caller to continue
 
         else:
-            logger.warning('\n\n\tOpción no válida. Por favor, intente de nuevo.\n')
+            logger.warning(f'Se ingreso {user_choice}, y no es valido (ANALYSIS ASSISTANT)')
+            print('\n\n\tOpción no válida. Por favor, intente de nuevo.\n')
             input('Presione Enter para volver al menú...')
             continue # Re-display menu
         

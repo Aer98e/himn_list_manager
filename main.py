@@ -78,12 +78,13 @@ def main():
         not_found_hymns = process_and_match_new_hymn_titles(data_tables) 
         
         if not_found_hymns:
-            logger.warning('=============== DATOS FALTANTES ===============')
-            logger.warning('Los siguientes himnos no fueron encontrados y no pudieron ser emparejados:')
+            logger.debug(f'No se pudieron reconoces los titulos: {not_found_hymns}')
+            print('=============== DATOS FALTANTES ===============')
+            print('Los siguientes himnos no fueron encontrados y no pudieron ser emparejados:')
             for hymn_title in not_found_hymns: 
-                logger.warning(f"- {hymn_title}")
-            logger.warning('_________________________________________________')
-            logger.warning('Para continuar, se requiere corrección manual o añadir estos títulos a la base de datos.\nUna vez corregido, puede re-procesar o continuar si el impacto es mínimo.')
+                print(f"- {hymn_title}")
+            print('_________________________________________________')
+            print('Para continuar, se requiere corrección manual o añadir estos títulos a la base de datos.\nUna vez corregido, puede re-procesar o continuar si el impacto es mínimo.')
             
             while True:
                 answer = input('¿Desea re-procesar el archivo actual (r), continuar de todas formas (c) o salir (s)?: ').strip().lower()
@@ -102,7 +103,8 @@ def main():
                     logger.info("El usuario eligió salir después de la advertencia de datos faltantes.")
                     return 0
                 else:
-                    logger.warning("Opción no válida. Por favor, ingrese 'r' para re-procesar, 'c' para continuar, o 's' para salir.")
+                    logger.warning("Se eligio {answer}, que es una respuesta inválida (Titulos no Emparejados)")
+                    print("Opción no válida. Por favor, ingrese 'r' para re-procesar, 'c' para continuar, o 's' para salir.")
             if answer in ["re-procesar", "reprocess", "r"]: # If re-process was chosen
                 continue # Continue the main `while True` loop from the beginning
 
@@ -125,14 +127,15 @@ def main():
     correct_dates = generate_schedule_dates(data_tables) 
     filtered_tables = filter_data_frames_by_date(data_tables, correct_dates) 
     new_dataframes = generate_hymn_dataframes(filtered_tables) 
-    master_dataframe = assemble_master_dataframe(new_dataframes, limit=3) 
+    master_dataframe = assemble_master_dataframe(new_dataframes, max_frames_per_row=3) 
 
     while True:
         sheet_title = input("¿Qué título llevará la hoja de himnos (no el nombre del archivo)?: ").strip()
         if sheet_title:
             break
         else:
-            logger.warning("El título de la hoja no puede estar vacío. Por favor, ingrese un título.")
+            logger.warning("No se ingreso nada para el titulo de la hoja.")
+            print("El título de la hoja no puede estar vacío. Por favor, ingrese un título.")
 
 
     logger.info("Generando nuevo archivo Excel con formato...")

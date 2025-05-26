@@ -152,16 +152,18 @@ def process_and_match_new_hymn_titles(data_frames: List[pd.DataFrame]) -> Option
                 break # Exit after the first high-confidence match
             
             # For lower scores, ask user (using logger for prompts that are part of this flow)
-            logger.info('----------------------------------')
-            logger.info(f"Posible coincidencia para el nuevo himno: '{original_new_title}'")
-            logger.info(f"Con el himno existente: '{db_original_title_for_match}' (Normalizado: '{matched_db_norm_title}')")
-            logger.info(f"Puntuación de coincidencia: {match_score:.2f}")
+            logger.debug(f'Se cree que {db_original_title_for_match} se compara a {original_new_title}.')
+            print('----------------------------------')
+            print(f"Posible coincidencia para el nuevo himno: '{original_new_title}'")
+            print(f"Con el himno existente: '{db_original_title_for_match}' (Normalizado: '{matched_db_norm_title}')")
+            print(f"Puntuación de coincidencia: {match_score:.2f}")
             
             while True:
                 user_confirmation = input(f"¿Son estos himnos el mismo? '{original_new_title}' Y '{db_original_title_for_match}' (s/n): ").strip().lower()
                 if user_confirmation in affirmative_answers or user_confirmation == 'n': # 'n' is a valid negative answer
                     break
-                logger.warning("Respuesta no válida. Por favor, ingrese 's' para sí o 'n' para no.")
+                print("Respuesta no válida. Por favor, ingrese 's' para sí o 'n' para no.")
+                logger.warning("Se ingresó una respuesta no valida para una posible coincidencia de títulos.")
             
             if user_confirmation in affirmative_answers:
                 logger.info(f"El usuario confirmó la coincidencia para '{original_new_title}' con '{db_original_title_for_match}'. Añadiendo al índice de búsqueda.")

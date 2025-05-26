@@ -131,7 +131,8 @@ def generate_hymn_dataframes(raw_data_frames: List[pd.DataFrame]) -> List[pd.Dat
         # First element of the new row is its index (or a counter)
         new_row_data = [current_row_index] 
         for detail in hymn_details:
-            new_row_data.append(detail if detail is not None else '-') # Replace None with '-'
+
+            new_row_data.append(detail if detail and detail is not None else '-') # Replace None with '-'
         df.loc[current_row_index] = new_row_data
 
     for raw_frame in raw_data_frames:

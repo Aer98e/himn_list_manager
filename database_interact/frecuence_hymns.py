@@ -39,7 +39,6 @@ def compile_hymn_usage_from_data_tables(data_tables_list: List[pd.DataFrame]) ->
     }
     """
     # Constants for column/data indexing
-    TITLE_COLUMN_INDEX = 1
     HYMN_ID_INDEX = 0
     HYMN_TITLE_INDEX = 1
 
@@ -48,7 +47,7 @@ def compile_hymn_usage_from_data_tables(data_tables_list: List[pd.DataFrame]) ->
         # Extract titles, including the date from the first row, and normalize them
         # `extract_table_titles` is assumed to return a list where the first item is the date string
         # and subsequent items are normalized hymn titles.
-        extracted_titles_and_date = extract_table_titles(data_table_df, TITLE_COLUMN_INDEX, normalize=True, include_date=True)
+        extracted_titles_and_date = extract_table_titles(data_table_df, normalize=True, include_date=True)
         
         if not extracted_titles_and_date:
             continue # Skip if no data was extracted
@@ -191,9 +190,9 @@ def process_and_update_hymn_frequencies(newly_compiled_frequencies: Dict[int, Di
     updates_to_apply = calculate_frequency_updates(previous_frequencies_from_db, newly_compiled_frequencies)
 
     if not run_automatically:
-        logger.info("Este proceso actualizará los registros de uso de himnos en la base de datos.")
-        logger.info("Esto afectará los análisis e informes futuros.")
-        logger.info("Solo proceda si la hoja de himnos actual es definitiva y correcta.\n")
+        print("Este proceso actualizará los registros de uso de himnos en la base de datos.")
+        print("Esto afectará los análisis e informes futuros.")
+        print("Solo proceda si la hoja de himnos actual es definitiva y correcta.\n")
         
         while True:
             user_confirmation = input("¿Desea continuar y actualizar la base de datos? (s/n): ").strip().lower()

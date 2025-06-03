@@ -137,7 +137,7 @@ def generate_hymn_dataframes(raw_data_frames: List[pd.DataFrame]) -> List[pd.Dat
 
     for raw_frame in raw_data_frames:
         # Extract titles; assumes title is in column 1, includes date from first row.
-        hymn_titles_with_date = extract_table_titles(raw_frame, 1, include_date=True) 
+        hymn_titles_with_date = extract_table_titles(raw_frame, include_date=True) 
         
         if not hymn_titles_with_date: # Skip if no titles (or date) were extracted
             continue
@@ -152,7 +152,9 @@ def generate_hymn_dataframes(raw_data_frames: List[pd.DataFrame]) -> List[pd.Dat
                 add_hymn_row_to_dataframe(hymn_df_shell, current_hymn_data)
             else:
                 # Handle case where hymn data is not found
-                raise ValueError(f'Hymn not found in database: {title}')
+                add_hymn_row_to_dataframe(hymn_df_shell, [title, "", ""])
+                logger.error(f"No se pudo identificar un himno en la base de datos, no se asignaran datos:: {title}")
+                # raise ValueError(f'Hymn not found in database: {title}')
         processed_df_list.append(hymn_df_shell)
 
     return processed_df_list

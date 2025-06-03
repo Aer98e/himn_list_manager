@@ -3,10 +3,11 @@ import datetime
 from typing import List, Optional, Any # For type hinting
 import pandas as pd # For type hinting DataFrames
 import logging
+from .configs_constants import COLUMN_INDEX
 
 # Constants for accessing date elements in DataFrames
 DATE_ROW_INDEX = 0
-DATE_COLUMN_INDEX = 1
+DATE_COLUMN_INDEX = COLUMN_INDEX
 
 # Weekday names in Spanish, as used by the original get_text_day function.
 # Consider localizing or making this configurable if supporting multiple languages.

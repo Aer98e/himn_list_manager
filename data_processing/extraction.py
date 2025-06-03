@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from utils.helpers import normalize_text # Changed from limpiar_texto1
+from .configs_constants import COLUMN_INDEX
 import logging
 
 # Get a logger for this module
@@ -80,7 +81,7 @@ def extract_data_frames(file_path: str, identifier: str, review_offset: int, col
 
     return extracted_data_frames
 
-def extract_table_titles(table_df: pd.DataFrame, column_index: int, normalize: bool = False, include_date: bool = False):
+def extract_table_titles(table_df: pd.DataFrame, normalize: bool = False, include_date: bool = False):
     """
     Extracts and optionally normalizes titles from a specified column in a DataFrame.
 
@@ -97,6 +98,7 @@ def extract_table_titles(table_df: pd.DataFrame, column_index: int, normalize: b
               date if `include_date` is True and normalization is applied) are normalized.
     """
     # Determine the starting row index based on whether to include the date
+    column_index = COLUMN_INDEX
     start_row = 0 if include_date else 1
     
     titles = table_df.iloc[start_row:, column_index].to_list()

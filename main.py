@@ -7,33 +7,16 @@ from interact_user.general import select_excel_file, get_save_excel_file_path
 from utils.helpers import move_processed_file, affirmative_answers, load_config_from_json
 import logging # Import the logging module
 
-# --- Logger Setup ---
-# Create a logger
-logger = logging.getLogger(__name__) # Using __name__ is a common practice
-logger.setLevel(logging.DEBUG) # Set the minimum logging level
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("app.log"),
+        logging.StreamHandler()
+    ]
+)
 
-# Create handlers (e.g., console and file)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO) # Console logs INFO and above
-
-# Optional: File handler to log everything (DEBUG and above) to a file
-# log_file_path = 'app_activity.log' # Consider making this path configurable
-# file_handler = logging.FileHandler(log_file_path)
-# file_handler.setLevel(logging.DEBUG)
-
-# Create formatters and add them to handlers
-# Simple format for console
-console_formatter = logging.Formatter('%(levelname)s: %(message)s')
-console_handler.setFormatter(console_formatter)
-
-# More detailed format for file
-# file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# file_handler.setFormatter(file_formatter)
-
-# Add handlers to the logger
-logger.addHandler(console_handler)
-# logger.addHandler(file_handler)
-# --- End Logger Setup ---
+logger = logging.getLogger(__name__)
 
 def main():
     logger.info('Iniciando la aplicación y el proceso de extracción de datos...')
@@ -58,7 +41,7 @@ def main():
     while True:
         try:
             logger.info(f"Procesando archivo: {file_path}")
-            data_tables = extract_data_frames(file_path, hymn_identifier, -1, (-2, 0)) 
+            data_tables = extract_data_frames(file_path, hymn_identifier, -1, (-1, 0)) 
             
             if not data_tables: 
                 logger.error("No se pudieron extraer las tablas de datos del archivo. Verifique el formato y contenido del archivo.")

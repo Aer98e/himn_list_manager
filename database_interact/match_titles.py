@@ -49,11 +49,10 @@ def process_and_match_new_hymn_titles(data_frames: List[pd.DataFrame]) -> Option
 
     def extract_unique_original_titles_from_frames() -> Set[str]:
         """Helper to extract all unique (non-normalized) hymn titles from the input DataFrames."""
-        TITLE_COLUMN_INDEX = 1 # Assumes hymn titles are in the second column
         original_titles_set: Set[str] = set()
         for frame_df in data_frames:
             # `extract_table_titles` with norm=False returns original titles
-            titles_in_frame = extract_table_titles(frame_df, TITLE_COLUMN_INDEX, normalize=False)
+            titles_in_frame = extract_table_titles(frame_df, normalize=False)
             original_titles_set.update(titles_in_frame)
         return original_titles_set
 

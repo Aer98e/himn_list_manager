@@ -2,12 +2,11 @@ import pandas as pd
 import numpy as np
 from utils.helpers import normalize_text # Changed from limpiar_texto1
 from .configs_constants import COLUMN_INDEX
-import logging
 
 # Get a logger for this module
-logger = logging.getLogger(__name__)
 
-def extract_data_frames(file_path: str, identifier: str, review_offset: int, column_slice: tuple[int, int]):
+def extract_data_frames(file_path: str, identifier: str,
+                        review_offset: int, column_slice: tuple[int, int]):
     """
     Extracts rectangular sections (data frames) from an Excel file based on a specific identifier.
     This function reads an Excel file into a NumPy array and identifies regions of interest
@@ -34,15 +33,8 @@ def extract_data_frames(file_path: str, identifier: str, review_offset: int, col
           column specified by `review_offset`.
         - The function skips regions with 2 or fewer rows.
     """
-    try:
-        # Read the Excel file into a DataFrame
-        df = pd.read_excel(file_path, header=None)
-    except FileNotFoundError:
-        logger.error(f"The file '{file_path}' was not found in extract_data_frames.") # Replaced print with logger
-        return [] # Return empty list on error
-    except Exception as e: # Catches other pandas/excel reading errors (e.g., xlrd.XLRDError, InvalidFileException)
-        logger.error(f"Error reading Excel file '{file_path}': {e}", exc_info=True) # Replaced print, added exc_info for traceback
-        return [] # Return empty list on error
+       
+    df = pd.read_excel(file_path, header=None)
         
     numpy_array = df.to_numpy()
 
@@ -101,10 +93,10 @@ def extract_table_titles(table_df: pd.DataFrame, normalize: bool = False, includ
     column_index = COLUMN_INDEX
     start_row = 0 if include_date else 1
     
-    titles = table_df.iloc[start_row:, column_index].to_list()
+    titles:list[str] = table_df.iloc[start_row:, column_index].to_list()
     
     if normalize:
-        normalized_titles = list(map(normalize_text, titles))
+        normalized_titles = list( map(normalize_text, titles) )
         if include_date and titles: # If a date is included, it should not be normalized
             normalized_titles[0] = titles[0] 
         return normalized_titles

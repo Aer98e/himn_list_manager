@@ -5,15 +5,12 @@ from .queries import add_to_search_index, find_title_by_normalized_text, get_all
 import numpy as np
 from typing import List, Set, Tuple, Optional, Dict
 import pandas as pd
-import logging
-
-logger = logging.getLogger(__name__)
 
 def extract_unique_original_titles_from_frames(data_frames: List[pd.DataFrame]) -> Set[str]:
     """Helper to extract all unique (non-normalized) hymn titles from the input DataFrames."""
     original_titles_set: Set[str] = set()
     for frame_df in data_frames:
-        titles_in_frame = extract_table_titles(frame_df, normalize=False)
+        titles_in_frame = extract_table_titles(frame_df)
         original_titles_set.update(titles_in_frame)
     return original_titles_set
 
@@ -25,21 +22,20 @@ def get_existing_normalized_titles_from_db() -> Tuple[List[str], Set[str]]:
 
 def identify_new_titles_to_process(
     data_frames: List[pd.DataFrame],
-    existing_normalized_set: Set[str]
+    saved_normalized_set: Set[str]
 ) -> Tuple[Optional[List[str]], Optional[List[str]]]:
     """
     Normalizes extracted original titles and filters out those already in the database.
     Returns a list of original new titles and a list of their normalized versions.
     """
-    all_original_titles_set = extract_unique_original_titles_from_frames(data_frames)
+    all_original_titles: set[str] = extract_unique_original_titles_from_frames(data_frames)
     new_normalized_to_original_map: Dict[str, str] = {}
-    for title in all_original_titles_set:
+    for title in all_original_titles:
         normalized = normalize_text(title)
-        if normalized not in existing_normalized_set:
+        if normalized not in saved_normalized_set:
             new_normalized_to_original_map[normalized] = title
 
     if not new_normalized_to_original_map:
-        logger.info('No new hymn titles found to process during title matching.')
         return None, None
 
     new_normalized_list = list(new_normalized_to_original_map.keys())
@@ -67,8 +63,8 @@ def find_top_n_matches_from_matrix(
     """For a single row of the similarity matrix, finds the top N best matches."""
     best_match_indices = np.argsort(similarity_matrix_row)[::-1][:top_n]
     top_matches = [
-        (existing_normalized_titles[j], float(similarity_matrix_row[j]))
-        for j in best_match_indices if similarity_matrix_row[j] > 0
+        (existing_normalized_titles[i], float(similarity_matrix_row[i]))
+        for i in best_match_indices if similarity_matrix_row[i] > 0
     ]
     return top_matches
 
@@ -88,16 +84,13 @@ def attempt_database_update_for_new_title(
     for matched_db_norm_title, match_score in top_matches_for_new_title:
         db_original_title_for_match = find_title_by_normalized_text(matched_db_norm_title)
         if db_original_title_for_match is None:
-            logger.warning(f"No se pudo encontrar el título original para el título normalizado '{matched_db_norm_title}' en la base de datos. Omitiendo esta coincidencia.")
             continue
 
         if match_score >= HIGH_CONFIDENCE_THRESHOLD:
-            logger.info(f"Coincidencia de alta confianza para '{original_new_title}' con el existente '{db_original_title_for_match}' (Puntuación: {match_score:.2f}). Añadiendo automáticamente al índice de búsqueda.")
             add_to_search_index(normalized_new_title, matched_db_norm_title)
             match_found_and_confirmed = True
             break
 
-        logger.debug(f'Se cree que {db_original_title_for_match} se compara a {original_new_title}.')
         print('----------------------------------')
         print(f"Posible coincidencia para el nuevo himno: '{original_new_title}'")
         print(f"Con el himno existente: '{db_original_title_for_match}' (Normalizado: '{matched_db_norm_title}')")
@@ -108,10 +101,8 @@ def attempt_database_update_for_new_title(
             if user_confirmation in affirmative_answers or user_confirmation == 'n':
                 break
             print("Respuesta no válida. Por favor, ingrese 's' para sí o 'n' para no.")
-            logger.warning("Se ingresó una respuesta no valida para una posible coincidencia de títulos.")
 
         if user_confirmation in affirmative_answers:
-            logger.info(f"El usuario confirmó la coincidencia para '{original_new_title}' con '{db_original_title_for_match}'. Añadiendo al índice de búsqueda.")
             add_to_search_index(normalized_new_title, matched_db_norm_title)
             match_found_and_confirmed = True
             break
@@ -124,7 +115,7 @@ def process_and_match_new_hymn_titles(data_frames: List[pd.DataFrame]) -> Option
     Processes hymn titles from a list of DataFrames, identifies new/unrecognized titles
     by comparing against existing normalized titles in the database, and attempts to match
     them using fuzzy string matching. Updates the database search index for confirmed matches.
-    """
+    """ 
     db_master_normalized_list, db_master_normalized_set = get_existing_normalized_titles_from_db()
     original_new_titles_list, normalized_new_titles_list = identify_new_titles_to_process(data_frames, db_master_normalized_set)
 

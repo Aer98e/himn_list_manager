@@ -113,7 +113,7 @@ def clear_cells_with_pattern(df: pd.DataFrame, indices: np.ndarray, pattern: str
     """Removes the pattern from the cells specified by the indices in the DataFrame."""
     for i, j in indices:
         if pd.notna(df.iat[i, j]) and isinstance(df.iat[i, j], str):
-            df.iat[i, j] = df.iat[i, j].replace(pattern, "")
+            df.iat[i, j] = df.iat[i, j].replace(pattern, "") # type: ignore
 
 def capture_format_change_indices(master_df: pd.DataFrame) -> dict[str, np.ndarray]:
     """

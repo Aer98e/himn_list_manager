@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Define a tuple of affirmative answers for wider use.
 # These are typically used for processing user input.
-affirmative_answers = ('y', 's', '1', 'yes', 'si', 'true', 'ok', 'okay')
+affirmative_answers:set = {'y', 's', '1', 'yes', 'si', 'true', 'ok', 'okay'}
 
 def normalize_text(text: Any) -> str:
     """

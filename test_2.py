@@ -5,6 +5,9 @@ from data_processing.formatting import generate_hymn_dataframes, assemble_master
 from database_interact.frecuence_hymns import compile_hymn_usage_from_data_tables, identify_and_display_hymn_duplications, process_and_update_hymn_frequencies, hymn_usage_analysis_assistant # Renamed
 from interact_user.general import select_excel_file, get_save_excel_file_path
 from utils.helpers import move_processed_file, affirmative_answers, load_config_from_json
+from general_objects import Hymn, DailyList, HymnSheet
+from test_1 import generate_sheet
+from datetime import date
 
 def main():    
     # Load extraction settings
@@ -52,6 +55,8 @@ def main():
                     print("Opción no válida. Por favor, ingrese 'r' para re-procesar, 'c' para continuar, o 's' para salir.")
             if answer in ["re-procesar", "reprocess", "r"]: # If re-process was chosen
                 continue # Continue the main `while True` loop from the beginning
+        
+        sheet = generate_sheet(data_tables)
 
         # Registrando himnos del archivo...
         hymn_frequencies = compile_hymn_usage_from_data_tables(data_tables) 

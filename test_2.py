@@ -5,7 +5,7 @@ from data_processing.formatting import generate_hymn_dataframes, assemble_master
 from database_interact.frecuence_hymns import compile_hymn_usage_from_data_tables, identify_and_display_hymn_duplications, process_and_update_hymn_frequencies, hymn_usage_analysis_assistant # Renamed
 from interact_user.general import select_excel_file, get_save_excel_file_path
 from utils.helpers import move_processed_file, affirmative_answers, load_config_from_json
-from general_objects import Hymn, DailyList, HymnSheet
+from interact_user.general_objects import Hymn, DailyList, HymnSheet
 from test_1 import generate_sheet
 from datetime import date
 
@@ -57,6 +57,15 @@ def main():
                 continue # Continue the main `while True` loop from the beginning
         
         sheet = generate_sheet(data_tables)
+        for hymn in list(sheet.hymns_list):
+            sum = 0
+            for day in sheet:
+                if hymn in day:
+                    sum += 1
+            if sum > 1:
+                print(f"Himno {hymn} ({sum})")
+        
+
 
         # Registrando himnos del archivo...
         hymn_frequencies = compile_hymn_usage_from_data_tables(data_tables) 

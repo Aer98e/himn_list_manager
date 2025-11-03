@@ -20,6 +20,16 @@ class Characteristics_Hymn():
         self.hymnal_use = Hymnal.NONE
 
 class Hymn(Characteristics_Hymn):
+    _hymns_cache = {}
+
+    def __new__(cls, *args) -> Self:
+        clave = tuple(args)
+        if clave in cls._hymns_cache:
+            return cls._hymns_cache[clave]
+        instancia = super().__new__(cls)
+        cls._hymns_cache[clave] = instancia
+        return instancia
+
     def __init__(self, title:str, id:int) -> None:
         super().__init__()
         self.__title = title
@@ -37,11 +47,11 @@ class Hymn(Characteristics_Hymn):
     def debug_info(self):
         return f"Hymn(title:{self.title}, id:{self.id})"
     
-    def __eq__(self, value:Self) -> bool: #type: ignore
-        return self.id == value.id
+    # def __eq__(self, value:Self) -> bool: #type: ignore
+    #     return self.id == value.id
     
-    def __hash__(self) -> int:
-        return self.id
+    # def __hash__(self) -> int:
+    #     return self.id
         
 
 class DailyList():
@@ -130,7 +140,7 @@ class HymnSheet():
         result=[]
         for list_h in self.__daily_lists:
             result.extend(list_h)
-        return result
+        return set(result)
     
     def __getitem__(self, index): return self.__daily_lists[index]
 

@@ -2,8 +2,8 @@ from interact_user.general_objects import Hymn, DailyList, HymnSheet
 from datetime import date
 import database_interact.queries as qu
 import data_processing.extraction as ex
-
-
+from database_interact.queries_test import print_sql_table
+from database_interact.searcher import searcher_db
 
 def generate_sheet(tables, year=None, month=None):
     today = date.today()
@@ -24,3 +24,9 @@ def generate_sheet(tables, year=None, month=None):
         
         sheet.append(day_li)
     return sheet
+
+# print_sql_table("Himnos")
+# print_sql_table("Himnario_usado")
+# print_sql_table("Indice_busqueda")
+
+searcher_db()

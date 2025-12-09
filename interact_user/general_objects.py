@@ -12,28 +12,36 @@ class Hymnal(Enum):
     POPULAR = "Popular"
     NONE = ""
 
-class Characteristics_Hymn():
+class _Characteristics_Hymn():
     def __init__(self) -> None:
         self.number = 0
         self.is_new = False
         self.traspose = False
         self.hymnal_use = Hymnal.NONE
+        """
+        Cada himno tiene un:
+          'number': Que hace referecia a un himnario o lista general.
+          'is_new': Nos indica si el himno se considera nuevo (cuando la congregacion recien lo está conociendo.)
+          'traspose': Nos indica si el himno cambia de tonalidad durante su ejecución.
+          'hymnal_use': Es específico para el caso en el que se usen otros himnarios, y se requiera saber a cual corresponde el himno.
+        """
 
-class Hymn(Characteristics_Hymn):
+class Hymn(_Characteristics_Hymn):
     _hymns_cache = {}
 
     def __new__(cls, *args) -> Self:
-        clave = tuple(args)
-        if clave in cls._hymns_cache:
-            return cls._hymns_cache[clave]
+        uniKey = tuple(args)
+        if uniKey in cls._hymns_cache:
+            return cls._hymns_cache[uniKey]
         instancia = super().__new__(cls)
-        cls._hymns_cache[clave] = instancia
+        cls._hymns_cache[uniKey] = instancia
         return instancia
 
     def __init__(self, title:str, id:int) -> None:
         super().__init__()
         self.__title = title
-        self.__id = id
+        self.__id = id # El id no necesariamente corresponde a un indice físico
+                       #  pero debe ser consistente entre multiples bases de datos.
 
     @property
     def title(self): return self.__title
@@ -45,23 +53,16 @@ class Hymn(Characteristics_Hymn):
 
     @property
     def debug_info(self):
-        return f"Hymn(title:{self.title}, id:{self.id})"
-    
-    # def __eq__(self, value:Self) -> bool: #type: ignore
-    #     return self.id == value.id
-    
-    # def __hash__(self) -> int:
-    #     return self.id
-        
+        return f"Hymn (title:{self.title}, id:{self.id})"
 
 class DailyList():
     size_max = 6
     def __init__(self, date_n:dt) -> None:
         self.__date: dt = date_n
         self.__hymn_list:list[Hymn] = []
-        self.__full = False
-        self.__active = True
-        self.priority = 0
+        self.__full = False     # Nos indica si se alcanzo el límite de elementos.
+        self.__active = True    # Util en procesamiento posterior ya que ignora este DailyList.
+        self.priority = 0       # Util para ordenamiento de DailyList con misma fecha.
 
     def verify_size(func): #type: ignore
         def wrapper(self, *args, **kwargs):
@@ -85,13 +86,12 @@ class DailyList():
     @property
     def active(self): return self.__active
 
-
     @property
     def full(self): return self.__full
 
-    def revise_size(self):
-        if len(self.hymn_list) == DailyList.size_max:
-            self.__full = True
+    # def revise_size(self):
+    #     if len(self.hymn_list) == DailyList.size_max:
+    #         self.__full = True
             # raise CapacityExceededError(DailyList.size_max)
 
     @verify_size #type: ignore
@@ -110,12 +110,13 @@ class DailyList():
     def __iter__(self): return iter(self.__hymn_list)
 
     @verify_size #type: ignore
-    def append(self, hymn:Hymn):#Agregar decorador de verificacion de rango
+    def append(self, hymn:Hymn):
         self.__hymn_list.append(hymn)
     
     def reposition(self, index:int, new_index:int):
         if (index > DailyList.size_max-1 or new_index > DailyList.size_max-1):
             raise IndexError("Indice fuera de rango.")
+        
         hymn = self.__hymn_list.pop(index)
         self.__hymn_list.insert(new_index, hymn)
     
@@ -150,7 +151,7 @@ class HymnSheet():
 
     def __iter__(self): return iter(self.__daily_lists)
 
-    def _duplicate(self, daily: DailyList):
+    def _duplicate(self, daily: DailyList): # Lista cuantos DailyList hay que tengan la fecha del objeto ingresado.
         return [day for day in self.__daily_lists if day.date == daily.date]
 
     def append(self, daily_list:DailyList):
@@ -161,26 +162,27 @@ class HymnSheet():
 
         self.update_positions()
         
-    def _extract_hymns(self, new_daily: DailyList):
-        return [hymn for hymn in new_daily]
+    # def _extract_hymns(self, new_daily: DailyList):
+    #     return [hymn for hymn in new_daily]
 
     def update_positions(self):
         self.__daily_lists.sort()
-    
-    def reposition(self, index, new_index):
-        if self.__daily_lists[index] == self.__daily_lists[new_index]:
-            self.__daily_lists[index].priority = 0
-            daily_list = self.__daily_lists.pop(index)
-            self.__daily_lists.insert(new_index, daily_list)
-            self._reload_positions()
-        else:
-            raise ValueError("No se puedo cambiar el orden si no coincide las fechas.")
-    
+
     def _reload_positions(self):
         for day in (d for d in self.__daily_lists if d.priority == 0):
             family = self._duplicate(day)
             for i, member in enumerate(family, 1):
                 member.priority = i
+    
+    def reposition(self, index, new_index):
+        if self.__daily_lists[index] == self.__daily_lists[new_index]: # Al comparar la igualdad de dos DailyList
+                                                                       #  solo se tiene en cuenta la fecha.
+            self.__daily_lists[index].priority = 0      # Esto indica que requiere reload_positions
+            daily_list = self.__daily_lists.pop(index)
+            self.__daily_lists.insert(new_index, daily_list)
+            self._reload_positions()
+        else:
+            raise ValueError("No se puede cambiar el orden si no coincide las fechas.")
 
     def __str__(self) -> str:
         return f"{self.title} [\n{',\n'.join(str(day_li) for day_li in self.__daily_lists)}\n]"

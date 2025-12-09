@@ -10,7 +10,6 @@ from test_1 import generate_sheet
 from datetime import date
 
 def main():    
-    # Load extraction settings
     extraction_config = load_config_from_json('extraction_settings')
 
     hymn_identifier = extraction_config.get('hymn_identifier', 'R') 
@@ -25,11 +24,9 @@ def main():
             print("Nada que revisar.")
             return 1 
 
-        # Registrando títulos desconocidos...
         not_found_hymns = process_and_match_new_hymn_titles(data_tables) 
         
         if not_found_hymns:
-            # No se pudieron reconoces los titulos: {not_found_hymns}
             print('=============== DATOS FALTANTES ===============')
             print('Los siguientes himnos no fueron encontrados y no pudieron ser emparejados:')
             for hymn_title in not_found_hymns: 
@@ -41,42 +38,21 @@ def main():
             while True:
                 answer = input('¿Desea re-procesar el archivo actual (r), continuar de todas formas (c) o salir (s)?: ').strip().lower()
                 if answer in ["re-procesar", "reprocess", "r"]:
-                    # El usuario eligió re-procesar. Reintentando extracción y procesamiento.
-                    break # Breaks inner loop to continue outer while loop
-                elif answer in ["continuar", "c"] or affirmative_answers.intersection(set(answer.split())): # "si" or "si continuar"
-                    # El usuario eligió continuar a pesar de los títulos faltantes. Los resultados podrían estar incompletos.
-                    not_found_hymns = None # Clear this to prevent re-entering this if block in the current iteration
-                    break # Breaks inner loop, outer loop continues to next stage
-                elif answer in ["salir", "s", "n", "no"]: # Explicit exit options
-                    # El usuario eligió salir después de la advertencia de datos faltantes.
+                    break 
+                elif answer in ["continuar", "c"] or affirmative_answers.intersection(set(answer.split())):
+                    not_found_hymns = None 
+                    break
+                elif answer in ["salir", "s", "n", "no"]:
                     return 0
                 else:
-                    # Se eligio {answer}, que es una respuesta inválida (Titulos no Emparejados)
                     print("Opción no válida. Por favor, ingrese 'r' para re-procesar, 'c' para continuar, o 's' para salir.")
-            if answer in ["re-procesar", "reprocess", "r"]: # If re-process was chosen
-                continue # Continue the main `while True` loop from the beginning
+            if answer in ["re-procesar", "reprocess", "r"]:
+                continue
         
         sheet = generate_sheet(data_tables)
-        for hymn in list(sheet.hymns_list):
-            sum = 0
-            for day in sheet:
-                if hymn in day:
-                    sum += 1
-            if sum > 1:
-                print(f"Himno {hymn} ({sum})")
-        
 
-
-        # Registrando himnos del archivo...
-        hymn_frequencies = compile_hymn_usage_from_data_tables(data_tables) 
-
-        # Buscando duplicaciones...
-        duplications_found = identify_and_display_hymn_duplications(hymn_frequencies) 
-        if not duplications_found:
-            # No se encontraron repeticiones de himnos en la hoja actual.
-            pass
-        
-        reinitialize_process = hymn_usage_analysis_assistant(set(hymn_frequencies.keys())) 
+        identify_and_display_hymn_duplications(sheet)
+        reinitialize_process = hymn_usage_analysis_assistant(sheet)
         if not reinitialize_process:
             break 
     

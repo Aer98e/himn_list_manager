@@ -6,6 +6,7 @@ import os
 from typing import List, Dict, Any, Set, Tuple, Optional # For type hinting
 import pandas as pd # For type hinting DataFrames
 import logging
+from interact_user.general_objects import Hymn, DailyList, HymnSheet
 
 # Get a logger for this module
 logger = logging.getLogger(__name__)
@@ -77,22 +78,17 @@ def compile_hymn_usage_from_data_tables(data_tables_list: List[pd.DataFrame]) ->
     return hymn_usage_details
 
 
-def identify_and_display_hymn_duplications(hymn_frequencies: Dict[int, Dict[str, Any]], display_on_console: bool = True) -> bool:
+def identify_and_display_hymn_duplications(hymns_sheet:HymnSheet, display_on_console: bool = True) -> bool:
     """
-    Identifies hymns used multiple times based on the frequency data.
-    Optionally prints the duplications to the console.
+    Bsuca en la hoja de himnos, para encontrar himnos duplicados, opcionalmente los imuestra en pantalla.
 
     Args:
-        hymn_frequencies (Dict[int, Dict[str, Any]]): A dictionary structured like the output of
-                                                     `compile_hymn_usage_from_data_tables`.
+        hymns_sheet: Un objeto HymnSheet que contiene un lista cargada.
         display_on_console (bool): If True, prints detected duplications to the console.
 
     Returns:
         bool: True if duplications were found, False otherwise.
     """
-    if not isinstance(hymn_frequencies, dict):
-        logger.critical("The 'hymn_frequencies' argument must be a dictionary.")
-        raise ValueError("The 'hymn_frequencies' argument must be a dictionary.")
     
     def _display_duplication_info_on_console(duplication_list: List[Dict[str, Any]]):
         """Helper function to print duplication details to the console."""
@@ -100,7 +96,6 @@ def identify_and_display_hymn_duplications(hymn_frequencies: Dict[int, Dict[str,
             os.system('cls')
         else: # For Linux/MacOS
             os.system('clear')
-        logger.debug(f'Se encontraron duplicaciones: {duplication_list}')
         print("\n====================== HIMNOS DUPLICADOS ENCONTRADOS ======================\n")
         for hymn_entry in duplication_list:
             print(f"El himno '{hymn_entry['title']}' (ID: {hymn_entry['id']}) se usa {hymn_entry['times_used']} veces en estas fechas:")
@@ -113,17 +108,22 @@ def identify_and_display_hymn_duplications(hymn_frequencies: Dict[int, Dict[str,
     found_duplications = False
     duplication_details_list = []
     
-    for hymn_id, usage_data in hymn_frequencies.items():
-        number_of_times_used = len(usage_data['dates'])
-        if number_of_times_used > 1:
-            found_duplications = True
-            duplication_details_list.append({
-                "id": hymn_id,
-                "title": usage_data['title'],
-                "times_used": number_of_times_used,
-                "dates": usage_data['dates']
-            })
-            
+    register = {himn:[] for himn in hymns_sheet.hymns_list} # Para regsitrar cuantas veces se usa un mismo himno.
+
+    for day in hymns_sheet:
+        for himn in day.hymn_list:
+            register[himn].append(day)
+    
+    register_f = {key:value for key, value in register.items() if len(value) > 1} #Filtra los himnso que han sido usados mas de una vez.
+    for himn_f, days in register_f.items():
+        found_duplications = True
+        duplication_details_list.append({
+            "id": himn_f.id,
+            "title": himn_f.title,
+            "times_used": len(days),
+            "dates": [date.date for date in days]
+        })
+        
     if display_on_console and found_duplications:
         _display_duplication_info_on_console(duplication_details_list)
         # Consider calling show_duplications_UI(duplication_details_list) here if it's meant to be part of this flow.
@@ -208,7 +208,7 @@ def process_and_update_hymn_frequencies(newly_compiled_frequencies: Dict[int, Di
     logger.info('Las frecuencias de los himnos han sido actualizadas en la base de datos.')
 
         
-def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
+def hymn_usage_analysis_assistant(himns_sheet) -> bool:
     """
     Provides an interactive console interface for analyzing hymn usage patterns.
     Allows users to view:
@@ -226,9 +226,6 @@ def hymn_usage_analysis_assistant(hymn_ids_in_current_sheet: Set[int]) -> bool:
     Raises:
         TypeError: If `hymn_ids_in_current_sheet` is not a set.
     """
-    if not isinstance(hymn_ids_in_current_sheet, set):
-        logger.critical('The input `hymn_ids_in_current_sheet` must be a Set.')
-        raise TypeError('The input `hymn_ids_in_current_sheet` must be a Set.')
     
     def display_analysis_menu():
         """Prints the analysis options menu to the console."""

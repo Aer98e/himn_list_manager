@@ -324,6 +324,15 @@ def update_hymn_frequencies_in_db(frequency_data_updates: List[Tuple[int, int, i
         if conn:
             conn.close()
 
+def getId_by_normTitle(title_norm:str):
+    query = """
+    SELECT id_himno
+    FROM Indice_busqueda
+    WHERE titulo_norm = ?
+    """
+    res = _execute_query(R_BUSQUEDA, query, (title_norm,), fetch_one=True)
+    return res[0]
+
 def main():
     # Example usage or testing can go here
     # Test find_title_by_normalized_text

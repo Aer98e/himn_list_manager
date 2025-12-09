@@ -4,6 +4,7 @@ main.spec
 __pycache__
 moment_2.py
 local_1
+local_2
 moment_3.py
 requirements.hash
 app.log

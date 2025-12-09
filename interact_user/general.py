@@ -1,4 +1,4 @@
-import tkinter as tk
+# import tkinter as tk
 from tkinter import filedialog
 import os
 from utils.helpers import load_config_from_json, save_config_to_json # Renamed functions
@@ -144,3 +144,26 @@ def get_save_excel_file_path(initialdir: Optional[str] = None, show_selected_pat
         logger.info(f"Save location selected by user: {file_path}") # Replaced print
         
     return file_path if file_path else "" # Ensure consistent return type
+
+def submit_form(fields: list):
+    """
+    Esta funcion debe recibir una lista de diccionarios con los campos:
+    title: str, type: str, optional: bool, y content:str
+    """
+    for field in fields:
+        title = field.title
+        type_in = field.type_i
+        optional = field.optional
+        content = field.content
+
+        consult = f" Ingrese [{title}] ({type_in})"
+        if optional:
+            consult += " [Opcional]"
+        if content:
+            consult+=f" [{content}]"
+        consult+=': '
+
+        ans = input(consult).strip()
+
+        if ans:
+            field.content = ans

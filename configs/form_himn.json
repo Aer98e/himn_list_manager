@@ -1,0 +1,44 @@
+[
+    {
+        "title":    "Título del himno",
+        "type":     "text",
+        "optional": false,
+        "content":  ""
+    },
+    {
+        "title":    "Número de Himnario General",
+        "type":     "integer",
+        "optional": false,
+        "content":  ""
+    },
+    {
+        "title":    "Número de Himnario Auxiliar",
+        "type":     "integer",
+        "optional": true,
+        "content":  ""
+    },
+    {
+        "title":    "¿Cómo se llama este himnario?",
+        "type":     "text", 
+        "optional": true,
+        "content":  ""
+    },
+    {
+        "title":    "¿Es un himno nuevo?",
+        "type":     "bool",
+        "optional": false,
+        "content":  "sí"
+    },
+    {
+        "title":    "¿Cambia de tono durante su ejecución?", 
+        "type":     "bool",
+        "optional": false,
+        "content":  "no"
+    },
+    {
+        "title":    "¿Activar seguimiento?", 
+        "type":     "bool",
+        "optional": false,
+        "content":  "sí"
+    }
+]

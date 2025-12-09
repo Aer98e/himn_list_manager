@@ -46,7 +46,8 @@ def calculate_similarity_matrix(
     new_normalized_titles: List[str],
     existing_normalized_titles: List[str]
 ) -> np.ndarray:
-    """Generates a similarity matrix using fuzzy partial ratio matching."""
+    """Generates a similarity matrix using fuzzy partial ratio matching.
+        Recordemos que primer parametro son filas, y segundo columnas"""
     similarity_matrix = process.cdist(
         new_normalized_titles,
         existing_normalized_titles,

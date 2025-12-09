@@ -83,7 +83,7 @@ def move_processed_file(new_file_path: str, source_folder: str = 'file_procces',
         logger.error(f"An unexpected error occurred in move_processed_file: {e}", exc_info=True) # Replaced print
 
 
-def load_config_from_json(config_name: str) -> Dict[Any, Any]:
+def load_config_from_json(config_name: str):
     """
     Loads a configuration dictionary from a JSON file located in the 'configs' directory.
 

@@ -6,7 +6,7 @@ from .queries import getId_by_normTitle
 from utils.helpers import normalize_text
 from interact_user.general import submit_form
 from interact_user.form_objects import GeneralField, EnumField
-from data_processing.validations import validation_input_form
+from data_processing.form_validator import validation_input_form
 
 
 def _consult_user():
@@ -42,9 +42,7 @@ def _select_user(matches:list):
         return idx
     else:
         raise NotImplemented
-        pass # Aun no implementado
-
-        
+        pass # Aun no implementado   
 
 def _find_matches(user_in):
     all_norm = get_all_normalized_titles()

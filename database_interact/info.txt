@@ -1,0 +1,11 @@
+file_names.py       --> Funciones para los paths de las bases de datos. (Archivo interno)
+frecuence_hymns.py  --> Lo relacionado con el uso de himnos, actualizaciones de estado, carga de estado, etc.
+match_titles.py     --> Busca el himno con mayores coincidencias en la base de datos, y actualiza nuevas referencias para  
+                            busquedas futuras.
+queries.py          --> En general consultas SQLite directas, es el corazon del paquete.
+searcher.py         --> Un buscador en desarrollo:
+                            - Inicia una interfaz.
+                            - Ingresas un titulo.
+                            - Te muestra las mejores coincidencias.
+                            - Escoges una opcion.
+                            - Retorna el el id(Base de Datos), de la opcion seleccionada.

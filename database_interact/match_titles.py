@@ -1,4 +1,4 @@
-from data_processing.extraction import extract_table_titles
+from data_processing.extractor import extract_table_titles
 from utils.helpers import normalize_text, affirmative_answers
 from rapidfuzz import fuzz, process
 from .queries import add_to_search_index, find_title_by_normalized_text, get_all_normalized_titles

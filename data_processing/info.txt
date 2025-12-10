@@ -1,0 +1,10 @@
+constants.py                --> Propio del paquete.
+dataframe_constructor.py    --> COnstruye el dataframe final.
+extractor.py                --> Extrae datos del excel plantilla y extrae titulos(himnos) de dataframe.
+form_validator.py           --> Valida datos de objetos GeneralField(database_interact.object_interact)
+pattern_formating.py        --> Para dar formato al nuevo excel, se usa un sistema de marcado con patrones, aquí           
+                                    algunas funciones relacionadas a este proceso.
+scheduler.py                --> Se encarga recoger fechas, corregir, etc de los dataframes, extraidos.(en sintesis todo lo  
+                                    que involuvra fechas.)
+                        
+sheet_constructor.py        --> Conversiones a objetos generales(Hymn, DailyList...)

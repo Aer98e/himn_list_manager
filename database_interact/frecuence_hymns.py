@@ -1,5 +1,5 @@
 from .queries import find_data_by_normalized_title, load_tracked_hymn_frequencies, update_hymn_frequencies_in_db, find_titles_by_ids
-from data_processing.extraction import extract_table_titles
+from extractor import extract_table_titles
 from utils.helpers import affirmative_answers # Renamed from ans_y
 # from interact_user.test import show_duplications_UI # This UI function might need separate refactoring or review
 import os
@@ -76,7 +76,6 @@ def compile_hymn_usage_from_data_tables(data_tables_list: List[pd.DataFrame]) ->
                 logger.warning(f"No database information found for normalized title: '{norm_title}' during frequency compilation.") # Replaced print
                 
     return hymn_usage_details
-
 
 def identify_and_display_hymn_duplications(hymns_sheet:HymnSheet, display_on_console: bool = True) -> bool:
     """
@@ -207,7 +206,6 @@ def process_and_update_hymn_frequencies(newly_compiled_frequencies: Dict[int, Di
     update_hymn_frequencies_in_db(updates_to_apply)
     logger.info('Las frecuencias de los himnos han sido actualizadas en la base de datos.')
 
-        
 def hymn_usage_analysis_assistant(himns_sheet) -> bool:
     """
     Provides an interactive console interface for analyzing hymn usage patterns.

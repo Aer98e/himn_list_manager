@@ -122,3 +122,9 @@ Para ejecutar los tests unitarios:
 ## Contribuciones
 
 Actualmente, no hay guías formales para contribuciones. Si desea contribuir, por favor contacte al mantenedor del proyecto o abra un "issue" para discutir los cambios.
+
+## Generado con IA
+
+## NOTA
+
+El proyecto ha sufrido varias modificaiones, por lo que puede no encontrar algunas carpetas o archivos antes mensionados, con todo esto gran parte de la lógica aun sigue presente.

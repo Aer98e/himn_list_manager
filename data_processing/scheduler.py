@@ -3,7 +3,7 @@ import datetime
 from typing import List, Optional, Any # For type hinting
 import pandas as pd # For type hinting DataFrames
 import logging
-from .configs_constants import COLUMN_INDEX
+from .constants import COLUMN_INDEX
 
 # Constants for accessing date elements in DataFrames
 DATE_ROW_INDEX = 0

@@ -1,0 +1,4 @@
+extraction_settings ---> Para extraccion del excel.
+form_himn           ---> Campos para añadir himno (object_interact.py)
+formating           ---> Configuracion para la hoja final.
+path_file           ---> Direccion de archivo cargado(se actualiza con el uso).

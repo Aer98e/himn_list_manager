@@ -1,0 +1,29 @@
+README.md               --> Explicación del funcionamiento del proyecto (IA)
+configs                 --> Archivos JSON.           
+database                --> Binarios de las bases de datos.
+database_interact       --> Interacción con la base de datos
+                               (busquedas, actualizaciones, etc).
+data_processing         --> Todo lo que requiera aplicar logica para datos.
+interact_user           --> Todo loq ue involucra interaccion directa con el usuario.    
+development             --> Codigo en desarrollo o incompleto.
+utils                   --> Funciones de uso general en todo el programa.
+others                  --> Nada importante
+
+
+comentarios.txt         --> Para anotar errores, o modificaciones necesarias.
+info.txt                -->     >> ESTE ARCHIVO <<
+Tutorial de Hymn_List_Manager.pdf --> Está desactualizado.
+
+
+Himnos 2025 Abril.xlsx  --> Archivo excel de referencia (no estandar). 
+Template.xlsx           --> Archivo exel de referencia (estandar).
+
+
+main.py                 --> Script principal.
+requirements.txt        --> Dependencias necesarias del proyecto.
+
+
+run.py                  --> Script para ejecutar el proyecto (Para producción)
+update_folder.py        --> Script para actualizar repositorio (Para producción).
+requirements.hash       --> hash de requerimientos (el script 'run.py' lo usa para saber 
+                                si hay modificaciones y descargar las nuevas.)

@@ -1,14 +1,22 @@
 import os
+from pathlib import Path
 
+def check_location(fun):
+    def wrapper():
+        file = Path('database')
+        if file.exists():
+            return fun()
+        else:
+            raise FileNotFoundError
+    return wrapper
+
+@check_location
 def R_BUSQUEDA():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, "database", "search_ref.db")
-    return db_path
+    return "database/search_ref.db"
 
+@check_location
 def R_GENERAL():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, "database", 'Registro_General_Himnos_2.db')
-    return db_path
+    return "database/Registro_General_Himnos_2.db"
 
 def main():
     pass

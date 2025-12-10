@@ -82,7 +82,6 @@ def move_processed_file(new_file_path: str, source_folder: str = 'file_procces',
     except Exception as e: # Catch any other unexpected errors
         logger.error(f"An unexpected error occurred in move_processed_file: {e}", exc_info=True) # Replaced print
 
-
 def load_config_from_json(config_name: str):
     """
     Loads a configuration dictionary from a JSON file located in the 'configs' directory.
@@ -129,7 +128,6 @@ def load_config_from_json(config_name: str):
         logger.error(f"I/O error reading configuration file '{config_file_path}': {e}", exc_info=True) # Replaced print
         raise # Re-raise for now
 
-
 def save_config_to_json(configuration_data: Dict[Any, Any], config_name: str):
     """
     Saves a configuration dictionary to a JSON file in the 'configs' directory.
@@ -153,7 +151,6 @@ def save_config_to_json(configuration_data: Dict[Any, Any], config_name: str):
         # Potentially raise a custom error or handle as per application policy
     except Exception as e:
         logger.error(f"An unexpected error occurred while saving configuration to '{config_file_path}': {e}", exc_info=True) # Replaced print
-
 
 def main():
     # Example usage or testing can go here

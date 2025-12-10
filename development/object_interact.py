@@ -1,6 +1,6 @@
 import sqlite3
 from interact_user.general import submit_form
-from data_processing.validations import validation_input_form
+from data_processing.form_validator import validation_input_form
 from utils.helpers import load_config_from_json
 
 
@@ -58,5 +58,20 @@ class Register_Himns():
         #modificado TEXT NOT NULL,
 
 def test():
-    pass
+    dat_hymn = load_config_from_json("form_himn")
+    
+    print(dat_hymn)
+
+    while True: # Cambiar para que solo sea un número limitado de veces
+        submit_form(dat_hymn)
+        errors = validation_input_form(dat_hymn, show_errors=True)
+        
+        if errors:
+            input("Presione enter para continuar...")
+            continue
+        
+        else:
+            print("Ingreso exitoso de los datos.")
+            break
+    return dat_hymn
         

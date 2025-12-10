@@ -1,0 +1,11 @@
+Partes de codigo en desarrollo.
+
+object_interact.py  --> Busca ser un gestor de interacción con la base de datos, para 
+                            crear, leeer, actualizar, y eliminar datos.
+
+queries_test.py     --> Solo es el diseño de las nuevas bases de datos, para brindar 
+                            nueva funcionalidad.
+
+new_main            --> Main, adaptado al uso de objetos para representar himnos y hojas.
+
+test_1              --> pruebas generales

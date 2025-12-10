@@ -2,10 +2,11 @@ import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
-from .extraction import extract_table_titles, capture_format_change_indices # Renamed capture_change_idx
-from database_interact.queries import extract_hymn_data_for_display # Renamed extract_data_db
-from utils.helpers import load_config_from_json # Renamed load_config
-from typing import List, Dict, Any # For type hinting
+from .extractor import extract_table_titles
+from .pattern_formating import capture_format_change_indices
+from database_interact.queries import extract_hymn_data_for_display
+from utils.helpers import load_config_from_json
+from typing import List, Any
 import os
 import logging # Import logging
 

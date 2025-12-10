@@ -1,0 +1,9 @@
+form_objects.py     --> Objetos para almacenar datos de un Formulario(Los campos)
+
+general_objects.py  --> Objetos que representan:
+                         - Himnos (Hymn)
+                         - Listas de Himnos (DailyList)
+                         - Listas de listas de himnos (HymnSheet)
+
+general.py          --> Interacción directa con el usuario. (Escoger
+                            un archivo, presentar un formulario.)

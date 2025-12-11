@@ -15,10 +15,10 @@ def print_sql_table(table:str):
 
 """
     CREATE TABLE Himnos(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT, # Para tener consistencia deben mantenerse los id.
         titulo TEXT NOT NULL, 
-        numH_gen INTEGER, 
-        numH_aux INTEGER,
+        numH_gen INTEGER,  #(numH_nuevo) -> anterior base de datos
+        numH_aux INTEGER,  #(numH_uso)   -> anterior base de datos
         es_nuevo INTEGER,
         sube_tono INTEGER,
         id_himnario INTEGER,
@@ -29,10 +29,10 @@ def print_sql_table(table:str):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         id_himno INTEGER NOT NULL,
         seguimiento INTEGER NOT NULL,
-        uso_real INTEGER NOT NULL,
-        uso_ult TEXT NOT NULL,
-        uso_prom INTEGER NOT NULL,
-        modificado TEXT NOT NULL,
+        uso_real INTEGER NOT NULL,  # Cantidad de veces usado.
+        uso_ult TEXT NOT NULL,      # Fecha de último uso "DD-MM-AA"
+        uso_prom INTEGER NOT NULL,  # Promedio en dias de cada cuanto tiempo se usa.
+        modificado TEXT NOT NULL,   # Cuanado se modificó esta fila "DD-MM-AA"
 
         FOREIGN KEY (id_himno) REFERENCES Himnos(id) ON DELETE CASCADE
     )
@@ -40,7 +40,8 @@ def print_sql_table(table:str):
     CREATE TABLE Indice_busqueda(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         id_himno INTEGER NOT NULL,
-        titulo_norm TEXT NOT NULL,
+        titulo_norm TEXT NOT NULL, # En util.helpers, se encuentra una funcion
+                                    # para normalizar los titulos, sino solo los copiamos.
         modificado TEXT NOT NULL,
         FOREIGN KEY (id_himno) REFERENCES Himnos(id) ON DELETE CASCADE
     )

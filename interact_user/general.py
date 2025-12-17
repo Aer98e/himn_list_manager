@@ -5,6 +5,8 @@ from utils.helpers import load_config_from_json, save_config_to_json # Renamed f
 import functools
 from typing import Callable, Any, Optional # For type hinting
 import logging
+from .form_objects import EnumField
+from data_processing.form_validator import validation_input_form
 
 # Get a logger for this module
 logger = logging.getLogger(__name__)
@@ -156,7 +158,7 @@ def submit_form(fields: list):
         optional = field.optional
         content = field.content
 
-        consult = f" Ingrese [{title}] ({type_in})"
+        consult = f" Ingrese {title} ({type_in})"
         if optional:
             consult += " [Opcional]"
         if content:
@@ -167,3 +169,21 @@ def submit_form(fields: list):
 
         if ans:
             field.content = ans
+
+def _display_menu(*args, title = "Menú"):
+    print(f"================== {title} ==================\n")
+    for i, arg in enumerate(args, start = 1):
+        print(f"\t{i}) {arg}")
+    print("____________________________________________________________________")
+
+def menu(*args, title = "Menú"):
+    _display_menu(*args, title = title)
+    field = EnumField("número de su opción", [str(i) for i in range(1, len(args)+1)])
+    while True:
+        submit_form([field])
+        validation_input_form([field], True)
+        if field.error == '': # Si no hay error
+            break
+
+    return field.content
+    

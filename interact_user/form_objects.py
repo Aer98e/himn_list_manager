@@ -46,6 +46,7 @@ class EnumField(GeneralField):
     def __init__(self, title_i: str, options_i:list,
                  optional_i=False, cnt_i='') -> None:
         super().__init__(title_i, optional_i, cnt_i)
+        self.type_i = Typ.Option
         self.options = []
         self.options.extend(options_i)
 

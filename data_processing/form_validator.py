@@ -31,7 +31,7 @@ def validation_input_form(fields:list[GeneralField], show_errors = False):
                 errors[title] = f"El valor ({content}), no se puede convertir a entero."
                 field.error = f"El valor ({content}), no se puede convertir a entero."
 
-        elif type_in == 'bool':
+        elif type_in == Typ.Bool:
             if isinstance(content, bool):
                 field.error = ''
                 continue
@@ -48,7 +48,7 @@ def validation_input_form(fields:list[GeneralField], show_errors = False):
                 errors[title] = f"La entrada {content}, no se puede interpretar como 'si' o 'no'"
                 field.error = f"La entrada {content}, no se puede interpretar como 'si' o 'no'"
         
-        elif type_in == "enum":
+        elif type_in == Typ.Option:
             if not isinstance(field, EnumField):
                 errors[title] = f"El tipo 'enum', debe ser instancia de EnumField"
                 field.error = f"El tipo 'enum', debe ser instancia de EnumField"

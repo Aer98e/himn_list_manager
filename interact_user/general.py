@@ -186,4 +186,14 @@ def menu(*args, title = "Menú"):
             break
 
     return field.content
-    
+
+def _bar(text='', leng=70, c="="):
+        size = (leng-len(text))
+        bar = c * (size//2)
+        text = f" {text} " if text else text
+        return bar + text + bar
+
+def print_message(message:str, title='', limit_len=70):
+    print(_bar(title, limit_len), "\n")
+    print(message, "\n")
+    print(_bar(leng=limit_len))

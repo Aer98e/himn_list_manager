@@ -1,5 +1,5 @@
-from .queries import find_data_by_normalized_title, load_tracked_hymn_frequencies, update_hymn_frequencies_in_db, find_titles_by_ids
-from extractor import extract_table_titles
+from .queries import find_data_by_normalized_title, load_tracked_hymn_frequencies, update_hymn_frequencies_in_db, find_titles_by_ids, get_total_hymns
+from data_processing.extractor import extract_table_titles
 from utils.helpers import affirmative_answers # Renamed from ans_y
 # from interact_user.test import show_duplications_UI # This UI function might need separate refactoring or review
 import os
@@ -7,6 +7,9 @@ from typing import List, Dict, Any, Set, Tuple, Optional # For type hinting
 import pandas as pd # For type hinting DataFrames
 import logging
 from interact_user.general_objects import Hymn, DailyList, HymnSheet
+from datetime import date
+from interact_user.general import menu, print_message, _bar
+from enum import Enum
 
 # Get a logger for this module
 logger = logging.getLogger(__name__)
@@ -129,206 +132,206 @@ def identify_and_display_hymn_duplications(hymns_sheet:HymnSheet, display_on_con
         
     return found_duplications
 
-def process_and_update_hymn_frequencies(newly_compiled_frequencies: Dict[int, Dict[str, Any]], run_automatically: bool = False):
-    '''
-    Updates the hymn frequency records in the database based on newly compiled frequency data.
-    It adjusts 'useful_frequency' (recent usage trend) and 'real_frequency' (overall count).
+#   ======================================================================================================================
+#                                   ACTUALIZAR INDICADORES DE FRECUENCIAS
+#   ======================================================================================================================
 
-    Args:
-        newly_compiled_frequencies (Dict[int, Dict[str, Any]]): Hymn frequencies from the latest processed sheet.
-                                                               Structure is like output of `compile_hymn_usage_from_data_tables`.
-        run_automatically (bool): If True, updates the database without user confirmation.
-
-    Notes:
-        - 'Useful frequency' logic:
-            - If a hymn is in `newly_compiled_frequencies`:
-                - If useful_freq was < 0 (not used recently), it's set to 1.
-                - If useful_freq was >= 0, it's incremented by 1.
-            - If a hymn is NOT in `newly_compiled_frequencies`:
-                - If useful_freq was > 0 (was used recently), it's set to 0.
-                - If useful_freq was <= 0, it's decremented by 1.
-        - 'Real frequency' is incremented by the number of times the hymn appears in the current sheet.
-    '''
-    
-    def calculate_frequency_updates(
-        previous_db_frequencies: List[Tuple[int, int, int]],
-        current_sheet_frequencies: Dict[int, Dict[str, Any]]
-    ) -> List[Tuple[int, int, int]]:
-        """
-        Calculates the new useful and real frequencies for each hymn.
-        """
-        # Constants for indexing tuples from `load_tracked_hymn_frequencies`
-        DB_ID_IDX = 0
-        DB_USEFUL_FREQ_IDX = 1
-        DB_REAL_FREQ_IDX = 2 
-
-        database_updates_pending = []
-
-        for db_hymn_freq_tuple in previous_db_frequencies:
-            hymn_id = db_hymn_freq_tuple[DB_ID_IDX]
-            useful_freq = db_hymn_freq_tuple[DB_USEFUL_FREQ_IDX]
-            real_freq = db_hymn_freq_tuple[DB_REAL_FREQ_IDX]
-
-            if hymn_id in current_sheet_frequencies:
-                # Hymn is in the current sheet
-                useful_freq = 1 if useful_freq < 0 else useful_freq + 1
-                real_freq += len(current_sheet_frequencies[hymn_id]['dates'])
-            else:
-                # Hymn is NOT in the current sheet
-                useful_freq = 0 if useful_freq > 0 else useful_freq - 1
-            
-            # Order for update_hymn_frequencies_in_db: (useful_freq, real_freq, hymn_id)
-            database_updates_pending.append((useful_freq, real_freq, hymn_id))
-            
-        return database_updates_pending
-    
-    # Load existing frequencies for hymns being tracked
-    previous_frequencies_from_db = load_tracked_hymn_frequencies()
-    
-    # Calculate the updates needed based on previous and new data
-    updates_to_apply = calculate_frequency_updates(previous_frequencies_from_db, newly_compiled_frequencies)
-
-    if not run_automatically:
-        print("Este proceso actualizará los registros de uso de himnos en la base de datos.")
-        print("Esto afectará los análisis e informes futuros.")
-        print("Solo proceda si la hoja de himnos actual es definitiva y correcta.\n")
-        
-        while True:
-            user_confirmation = input("¿Desea continuar y actualizar la base de datos? (s/n): ").strip().lower()
-            if user_confirmation in affirmative_answers:
-                break
-            elif user_confirmation == 'n':
-                logger.warning('Actualización de la base de datos cancelada por el usuario.')
-                return None 
-            else:
-                logger.warning("Respuesta no válida. Por favor, ingrese 's' para sí o 'n' para no.")
-            
-    update_hymn_frequencies_in_db(updates_to_apply)
-    logger.info('Las frecuencias de los himnos han sido actualizadas en la base de datos.')
-
-def hymn_usage_analysis_assistant(himns_sheet) -> bool:
+def _calculate_new_frecuencies(id:int, date:date, last_record:dict):
     """
-    Provides an interactive console interface for analyzing hymn usage patterns.
-    Allows users to view:
-        1. Hymns used in the current sheet that were also used in the last >=2 sheets.
-        2. Hymns NOT used in the current sheet and the previous sheet.
-        3. Least frequently used hymns overall.
-    The user can choose to re-process the current sheet (returns True) or continue (returns False).
+    Con los nuevos datos calcula las modificaciones que se haran en la tabla Frecuencias de la Base de Datos
 
-    Args:
-        hymn_ids_in_current_sheet (Set[int]): A set of hymn IDs present in the currently processed sheet.
-
-    Returns:
-        bool: True if the user opts to re-process the sheet, False to continue with the main workflow.
-    
-    Raises:
-        TypeError: If `hymn_ids_in_current_sheet` is not a set.
+    :param id: Id que apunta en la base de datos al himno que esta seindo procesado.
+    :type id: int
+    :param date: Fecha del cuadro al que pertenece el himno procesado.
+    :type date: date
+    :param last_record: Último registro guardado del himno procesado.
+    :type last_record: dict
     """
+    prev_last =    last_record['last'] #Revisar indices o optar por otro metodo
+    prev_real =    last_record['real']
+    prev_average = last_record['average']
+
+    new_last = date
+    new_real = prev_real + 1
+
+    prev_last_d = date.fromisoformat(prev_last)
+    diff = (new_last - prev_last_d).days
+    new_average = (prev_average*prev_real+diff)/new_real
+
+    return {
+        id:{
+            "last" : new_last,
+            "real" : new_real,
+            "average" : new_average
+        }}
+
+def _update_warning():
+    """
+    Muestra en pantalla la advertencia de que se modificará la base de datos y espera respuesta del usuario.
+    """
+    print("Este proceso actualizará los registros de uso de himnos en la base de datos.")
+    print("Esto afectará los análisis e informes futuros.")
+    print("Solo proceda si la hoja de himnos actual es definitiva y correcta.\n")
     
-    def display_analysis_menu():
-        """Prints the analysis options menu to the console."""
-        if os.name == 'nt': os.system('cls')
-        else: os.system('clear')
-        print("================== Asistente de Análisis de Uso de Himnos ==================\n")
-        print("\t1) Mostrar himnos usados recientemente y también en esta hoja.")
-        print("\t2) Mostrar himnos NO usados en la(s) última(s) hoja(s) INCLUIDA esta.")
-        print("\t3) Mostrar himnos menos usados en general.")
-        print("\t4) Re-procesar la hoja actual (ej. después de corrección manual de datos).")
-        print("\t5) Continuar con la ejecución del programa.")
-        print("____________________________________________________________________")
-        user_choice = input('Ingrese el número de su opción: ').strip()
-        return user_choice
-
-    def display_analysis_results(results_list: List[Tuple[str, int]], report_type: str):
-        """Formats and prints the analysis results."""
-        if not results_list:
-            print("\nNo se encontraron himnos que coincidan con sus criterios para este informe.")
-            print("===============================================================")
-            return
-        
-        print("\n======================== Resultados del Análisis =========================")
-        if report_type == "recently_used" or report_type == "not_used_recently":
-            current_group_val = results_list[0][1] 
-            if current_group_val > 0:
-                print(f'\n==== Usado en las Últimas {current_group_val} Hoja(s) ====')
-            else:
-                 print(f'\n==== No Usado Durante las Últimas {abs(current_group_val)} Hoja(s) ====')
-
-            for i, (title, value) in enumerate(results_list):
-                if value != current_group_val:
-                    current_group_val = value
-                    if current_group_val > 0:
-                        print(f'\n==== Usado en las Últimas {current_group_val} Hoja(s) ====')
-                    else:
-                        print(f'\n==== No Usado Durante las Últimas {abs(current_group_val)} Hoja(s) ====')
-                print(f'{i+1}. {title} (Factor de Uso: {value})')
-        
-        elif report_type == "least_used":
-            print(f'\n==== Conteo General de Uso ====')
-            for i, (title, value) in enumerate(results_list):
-                print(f'{i+1}. {title} (Total de Veces Usado: {value})')
-                
-        print("===============================================================")
-
-    # Load all tracked hymn frequencies from DB
-    db_frequencies = load_tracked_hymn_frequencies() # Returns list of (id, useful_freq, real_freq)
-    # Convert to a dictionary for easier lookup: {id: {'useful': val, 'real': val}}
-    db_freq_dict = {item[0]: {'useful': item[1], 'real': item[2]} for item in db_frequencies}
-    
-    # Prepare data for "Least Frequently Used" report (sorted by real frequency)
-    real_freq_sorted_list = sorted(db_frequencies, key=lambda x: x[2]) # Sort by real_freq (index 2)
-
-    # Prepare data for "Recently Used and In Current Sheet"
-    # Hymns in current sheet AND have useful_freq > 1 (meaning used in at least 2 prior consecutive sheets)
-    ids_used_recently_and_in_sheet = [
-        h_id for h_id in hymn_ids_in_current_sheet 
-        if h_id in db_freq_dict and db_freq_dict[h_id]['useful'] > 1
-    ]
-    useful_freq_for_recently_used = [db_freq_dict[h_id]['useful'] for h_id in ids_used_recently_and_in_sheet]
-
-    # Prepare data for "Used Last Sheet but Not Current"
-    # Hymns NOT in current sheet AND have useful_freq < 0 (meaning not used in this one, maybe others before)
-    # Specifically, useful_freq == -1 would mean not used in the one just before this, include this.
-    # useful_freq < 1 (i.e. 0 or negative) means not used in the *immediately* preceding recorded period for sure.
-    ids_not_in_sheet_but_used_before = [
-        h_id for h_id in db_freq_dict 
-        if h_id not in hymn_ids_in_current_sheet and db_freq_dict[h_id]['useful'] < 0 
-    ] # useful_freq < 0 indicates a trend of non-usage.
-    useful_freq_for_not_used = [db_freq_dict[h_id]['useful'] for h_id in ids_not_in_sheet_but_used_before]
-
     while True:
-        user_choice = display_analysis_menu()
-        report_data_to_show = []
-        report_type = ""
+        user_confirmation = input("¿Desea continuar y actualizar la base de datos? (s/n): ").strip().lower()
+        
+        if   user_confirmation in affirmative_answers: return True
+        elif user_confirmation == 'n':                 return False 
+        else: print("Respuesta no válida. Por favor, ingrese 's' para sí o 'n' para no.")    
+
+def update_frecuency_register(hymn_sheet:HymnSheet):
+    """
+    Actualiza el registro de frecuencias de la base de datos.
+    Antes advierte al ususario para continuar o cancelar operacion.
+    
+    :param hymn_sheet: Objeto que representa una hoja(programa de himnos)
+    :type hymn_sheet: HymnSheet
+    """
+    if not _update_warning():
+        return None
+    
+    updates = {}
+    for day in hymn_sheet:
+        h_date = day.date
+        for himn in day:
+            last_record = load_tracked_hymn_frequencies(himn.id)
+            new_data = _calculate_new_frecuencies(himn.id, h_date, last_record)
+            updates.update(new_data)
+    
+    update_hymn_frequencies_in_db(updates)
+
+#   ======================================================================================================================
+#                                   ASISTENTE DE ANALISIS DE HIMNOS
+#   ======================================================================================================================
+
+def _get_differences_days(hymn, current_date:date):
+    if isinstance(hymn, int):
+        hymn_id = hymn
+    elif isinstance(hymn, Hymn):
+        hymn_id = hymn.id
+    else:
+        raise ValueError
+    
+    last_record = load_tracked_hymn_frequencies(hymn_id)
+    last_date = date.fromisoformat(last_record['last'])
+    diffence = current_date-last_date
+    return diffence.days
+
+def _get_hymns_already_used(hymn_sheet:HymnSheet):
+    hymns_used = []
+    
+    for day in hymn_sheet:
+        for hymn in day:
+            differece_days = _get_differences_days(hymn, day.date)
+            hymns_used.append((hymn, differece_days))
+            hymns_used.sort(key = lambda x:x[1])
+    return hymns_used
+
+def _get_hymns_unused(hymn_sheet:HymnSheet):
+    hymns_unused = []
+
+    hymns = set(hymn_sheet.hymns_list)
+    hymns_id = [hymn.id for hymn in hymns]
+    for i in range(1, get_total_hymns()+1):
+        if i in hymns_id:
+            continue
+        difference_days = _get_differences_days(i, date.today())
+        title = find_titles_by_ids(i)[0]
+        hymns_unused.append((title, difference_days))
+        hymns_unused.sort(key = lambda x:x[1], reverse=True)
+    return hymns_unused
+
+def _get_hymns_least_used(hymn_sheet:HymnSheet):
+    title = 'Falta implementar :)'
+    total_days_used = 0
+    return[(title, total_days_used)]
+
+def _display_frecuency_menu():
+    """Prints the analysis options menu to the console."""
+    if os.name == 'nt': os.system('cls')
+    else: os.system('clear')
+    
+    ans = menu(
+    "Mostrar himnos usados recientemente y también en esta hoja.",
+    "Mostrar himnos NO usados en la(s) última(s) hoja(s) INCLUIDA esta.",
+    "Mostrar himnos menos usados en general.",
+    "Re-procesar la hoja actual (ej. después de corrección manual de datos).",
+    "Continuar con la ejecución del programa.",
+    title = "Asistente de Análisis de Uso de Himnos")
+    
+    return ans
+
+class mode(Enum):
+    ALREADY = "already_used"
+    UNUSED = "unused"
+    LEAST = "least_used"
+
+def _get_register(hymns_sheet:HymnSheet, type_c: mode):
+    """Formats and prints the analysis results."""
+    collectors = {
+        mode.ALREADY: _get_hymns_already_used,
+        mode.UNUSED:  _get_hymns_unused,
+        mode.LEAST:   _get_hymns_least_used
+    }        
+
+    def _create_register(data:tuple, idx = 1)->Dict[int, List]:
+        keys = set([dat[idx] for dat in data])
+        return {key:[] for key in keys}
+    
+    def _fill_register(register:dict, data:tuple):
+        for dat in data:
+            register[dat[1]].append(dat[0])
+
+    collector = collectors[type_c]
+
+    data = collector(hymns_sheet) # type: ignore
+
+    if data:
+        register = _create_register(data)
+        _fill_register(register, data)
+        return register
+
+def _display_register(register:dict, type_p:mode):
+    printers = {
+        mode.ALREADY: lambda amount, days: f"{amount} himnos usados hace {days} días.",
+        mode.UNUSED:  lambda amount, days: f"{amount} himnos no usados en {days} días.",
+        mode.LEAST:   lambda amount, times: f"{amount} himnos usados solo {times} veces."
+    }
+    subtitle_f = printers[type_p]
+
+    print(_bar(text="Resultados del Análisis"))
+
+    for days, titles in register.items():
+        
+        subtitle = _bar(subtitle_f(len(titles), days), c="*")
+        print(subtitle)
+        for i, title in enumerate(titles, 1):
+            print(f"\t{i}) {title}")
+        
+    print(_bar())
+
+def hymn_usage_analysis_assistant(hymns_sheet, restart:list[bool]):
+    while True:
+        user_choice = _display_frecuency_menu()
+        report_type:mode
 
         if user_choice == '1': # Recently used and in this sheet
-            titles = find_titles_by_ids(ids_used_recently_and_in_sheet)
-            report_data_to_show = list(zip(titles, useful_freq_for_recently_used))
-            # Sort by useful frequency, descending (most recent/frequent first)
-            report_data_to_show.sort(key=lambda x: x[1], reverse=True)
-            report_type = "recently_used"
+            report_type = mode.ALREADY
             
         elif user_choice == '2': # Not used last sheet(s) and not this one
-            titles = find_titles_by_ids(ids_not_in_sheet_but_used_before)
-            report_data_to_show = list(zip(titles, useful_freq_for_not_used))
-            # Sort by useful frequency, ascending (most "missed" first, i.e., more negative)
-            report_data_to_show.sort(key=lambda x: x[1])
-            report_type = "not_used_recently"
+            report_type = mode.UNUSED
             
         elif user_choice == '3': # Least used overall
-            TOP_N_LEAST_USED = 25 # Define how many to show
-            ids_for_least_used = [item[0] for item in real_freq_sorted_list[:TOP_N_LEAST_USED]]
-            real_freq_values = [item[2] for item in real_freq_sorted_list[:TOP_N_LEAST_USED]]
-            titles = find_titles_by_ids(ids_for_least_used)
-            report_data_to_show = list(zip(titles, real_freq_values))
-            # Already sorted by real frequency by `real_freq_sorted_list`
-            report_type = "least_used"
+            report_type = mode.LEAST
         
         elif user_choice == '4': # Re-process
-            return True # Signal to the caller to re-process
+            restart[0] = True # Signal to the caller to re-process
+            break
         
         elif user_choice == '5': # Continue
-            return False # Signal to the caller to continue
+            restart[0] = False # Signal to the caller to continue
+            break
 
         else:
             logger.warning(f'Se ingreso {user_choice}, y no es valido (ANALYSIS ASSISTANT)')
@@ -336,5 +339,12 @@ def hymn_usage_analysis_assistant(himns_sheet) -> bool:
             input('Presione Enter para volver al menú...')
             continue # Re-display menu
         
-        display_analysis_results(report_data_to_show, report_type)
+        register = _get_register(hymns_sheet, report_type)
+        if register:
+            _display_register(register, report_type)
+
+        else:
+            #No existe un regsitro
+            pass
+
         input('\nPresione Enter para volver al menú de análisis...')

@@ -333,6 +333,18 @@ def getId_by_normTitle(title_norm:str):
     res = _execute_query(R_BUSQUEDA, query, (title_norm,), fetch_one=True)
     return res[0]
 
+def get_total_hymns():
+    query = """
+    SELECT COUNT(*)
+    FROM Himnos
+    JOIN Frecuencias
+    ON Himnos.id = Frecuencias.id_himno
+    WHERE Frecuencias.seguimiento = 1
+    """
+    res = _execute_query(R_BUSQUEDA, query, fetch_one=True)
+    
+    return res[0]
+
 def main():
     # Example usage or testing can go here
     # Test find_title_by_normalized_text

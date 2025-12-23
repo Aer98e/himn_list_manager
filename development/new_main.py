@@ -2,7 +2,7 @@ from extractor import extract_data_frames
 from database_interact.match_titles import process_and_match_new_hymn_titles
 from data_processing.scheduler import generate_schedule_dates, filter_data_frames_by_date
 from dataframe_constructor import generate_hymn_dataframes, assemble_master_dataframe, apply_excel_formatting
-from database_interact.frecuence_hymns import compile_hymn_usage_from_data_tables, identify_and_display_hymn_duplications, process_and_update_hymn_frequencies, hymn_usage_analysis_assistant # Renamed
+from database_interact.frecuence_hymns import compile_hymn_usage_from_data_tables, identify_and_display_hymn_duplications, update_frecuency_register, hymn_usage_analysis_assistant # Renamed
 from interact_user.general import select_excel_file, get_save_excel_file_path
 from utils.helpers import move_processed_file, affirmative_answers, load_config_from_json
 from interact_user.general_objects import Hymn, DailyList, HymnSheet
@@ -52,12 +52,14 @@ def main():
         sheet = generate_sheet(data_tables)
 
         identify_and_display_hymn_duplications(sheet)
-        reinitialize_process = hymn_usage_analysis_assistant(sheet)
-        if not reinitialize_process:
+        
+        restart = [False]
+        hymn_usage_analysis_assistant(sheet, restart)
+        if not restart[0]:
             break 
     
     # Registrando frecuencias de himnos de la hoja en la base de datos...
-    process_and_update_hymn_frequencies(hymn_frequencies) 
+    update_frecuency_register(sheet) 
 
     # Organizando datos para la hoja final de Excel...
     correct_dates = generate_schedule_dates(data_tables, 9) 

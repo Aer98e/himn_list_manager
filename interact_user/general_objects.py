@@ -1,5 +1,5 @@
 from datetime import date as dt
-from typing import Self
+from typing import Any
 from enum import Enum
 
 class CapacityExceededError(Exception):
@@ -29,7 +29,7 @@ class _Characteristics_Hymn():
 class Hymn(_Characteristics_Hymn):
     _hymns_cache = {}
 
-    def __new__(cls, *args) -> Self:
+    def __new__(cls, *args) -> "Hymn":
         uniKey = tuple(args)
         if uniKey in cls._hymns_cache:
             return cls._hymns_cache[uniKey]
@@ -120,10 +120,10 @@ class DailyList():
         hymn = self.__hymn_list.pop(index)
         self.__hymn_list.insert(new_index, hymn)
     
-    def __eq__(self, other: Self) -> bool: #type: ignore
+    def __eq__(self, other: "DailyList") -> bool: #type: ignore
         return self.date == other.date
 
-    def __lt__(self, other: Self):
+    def __lt__(self, other: "DailyList"):
         if self.date == other.date:
             return self.priority < other.priority
         return self.date < other.date
@@ -185,4 +185,5 @@ class HymnSheet():
             raise ValueError("No se puede cambiar el orden si no coincide las fechas.")
 
     def __str__(self) -> str:
-        return f"{self.title} [\n{',\n'.join(str(day_li) for day_li in self.__daily_lists)}\n]"
+        days_str = ',\n'.join(str(day_li) for day_li in self.__daily_lists)
+        return f"{self.title} [\n{days_str}\n]"

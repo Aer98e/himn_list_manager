@@ -4,16 +4,56 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 from .extractor import extract_table_titles
 from .pattern_formating import capture_format_change_indices
-from database_interact.queries import extract_hymn_data_for_display
+from database_interact.queries import extract_hymn_data_for_display, get_hymns_with_last_date
 from utils.helpers import load_config_from_json
 from typing import List, Any
 import os
 import logging # Import logging
+import datetime
 
 # Get a logger for this module
 logger = logging.getLogger(__name__)
 
 # shutil is not used in this refactored version directly, but os is used for path operations.
+
+def recommend_hymns_based_on_history(target_date: datetime.date, min_days_threshold: int = 30) -> List[int]:
+    """
+    Selects candidate hymns based on 'days without singing'.
+    Hymns sung recently (within min_days_threshold) are excluded.
+    The remaining hymns are sorted by usage recency (least recently used first).
+
+    Args:
+        target_date (datetime.date): The date for which we are generating the schedule.
+        min_days_threshold (int): Minimum days required since last usage to be considered.
+
+    Returns:
+        List[int]: A list of hymn IDs sorted by days without singing (descending).
+    """
+    all_hymns_history = get_hymns_with_last_date()
+    candidates = []
+
+    for hymn_id, last_date_iso in all_hymns_history:
+        if last_date_iso:
+            try:
+                last_date = datetime.date.fromisoformat(last_date_iso)
+                days_without_singing = (target_date - last_date).days
+            except ValueError:
+                logger.warning(f"Invalid date format for hymn {hymn_id}: {last_date_iso}")
+                days_without_singing = 9999 # Treat as very old
+        else:
+             days_without_singing = 99999 # Never sung, highest priority
+
+        # Filter
+        if days_without_singing < min_days_threshold:
+            continue
+        
+        candidates.append((hymn_id, days_without_singing))
+
+    # Sort: Descending order of days_without_singing (Those not sung for longest time go first)
+    candidates.sort(key=lambda x: x[1], reverse=True)
+
+    return [c[0] for c in candidates]
+
 
 def assemble_master_dataframe(data_frame_list: List[pd.DataFrame], max_frames_per_row: int = 3) -> pd.DataFrame:
     """

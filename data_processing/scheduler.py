@@ -7,7 +7,7 @@ from .constants import COLUMN_INDEX
 
 # Constants for accessing date elements in DataFrames
 DATE_ROW_INDEX = 0
-DATE_COLUMN_INDEX = COLUMN_INDEX
+DATE_COLUMN_INDEX = 0
 
 # Weekday names in Spanish, as used by the original get_text_day function.
 # Consider localizing or making this configurable if supporting multiple languages.
@@ -15,11 +15,11 @@ WEEKDAY_NAMES_ES = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBA
 
 logger=logging.getLogger(__name__)
 
-def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int] = None, year: Optional[int] = None) -> List[Optional[str]]:    
+def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int] = None, year: Optional[int] = None) -> List[Optional[tuple]]:    
     """
-    Generates a list of formatted date strings for scheduling based on day numbers extracted
-    from a list of DataFrames. It filters out past dates and adds 'M' (Morning) or 'T' (Afternoon)
-    suffixes for same-day events.
+    Generates a list of tuples containing formatted date strings and ISO date strings 
+    for scheduling based on day numbers extracted from a list of DataFrames. 
+    It filters out past dates and adds 'M' (Morning) or 'T' (Afternoon) suffixes for same-day events.
 
     Args:
         data_frames (List[pd.DataFrame]): A list of DataFrames, where each DataFrame is expected
@@ -29,8 +29,8 @@ def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int
         year (Optional[int]): The year to use for constructing dates. Defaults to the current year.
 
     Returns:
-        List[Optional[str]]: A list of formatted date strings (e.g., "LUNES 01 M") or None for
-                             dates that are in the past.
+        List[Optional[tuple]]: A list of tuples (formatted_date_text, iso_date_str) 
+                               e.g., ("LUNES 01 M", "2023-10-01") or None for dates that are in the past.
     """
     
     def extract_day_numbers_from_frames(frames: List[pd.DataFrame]) -> List[int]:
@@ -56,7 +56,7 @@ def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int
         weekday_index = date_obj.weekday() # Monday is 0 and Sunday is 6
         return f'{WEEKDAY_NAMES_ES[weekday_index]} {day_of_month:02}'
 
-    schedule_date_texts = []
+    schedule_dates_data = [] # Stores (text, iso) tuples or None
     current_date = datetime.date.today()
     
     # Use provided month/year or default to current month/year
@@ -72,15 +72,16 @@ def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int
         except ValueError as e:
             # Handle invalid dates (e.g., February 30th)
             logger.error(f"Invalid date created for day {day_num}, month {effective_month}, year {effective_year}: {e}")
-            schedule_date_texts.append(None) # Or some other error indicator
+            schedule_dates_data.append(None) # Or some other error indicator
             continue
 
         # Skip processing for dates in the past
         if event_date < current_date:
-            schedule_date_texts.append(None)
+            schedule_dates_data.append(None)
             continue
         
         formatted_date_text = format_date_text(event_date)
+        iso_date_str = event_date.isoformat()
 
         if is_afternoon_slot:
             formatted_date_text += ' T' # Append 'T' for Tarde (Afternoon)
@@ -90,24 +91,25 @@ def generate_schedule_dates(data_frames: List[pd.DataFrame], month: Optional[int
             formatted_date_text += ' M' # Append 'M' for Mañana (Morning)
             is_afternoon_slot = True # Set flag for the next iteration
         
-        schedule_date_texts.append(formatted_date_text)
+        schedule_dates_data.append((formatted_date_text, iso_date_str))
         
-    return schedule_date_texts
+    return schedule_dates_data
     
-def filter_data_frames_by_date(data_frames: List[pd.DataFrame], schedule_dates: List[Optional[str]]) -> List[pd.DataFrame]:
+def filter_data_frames_by_date(data_frames: List[pd.DataFrame], schedule_dates: List[Optional[tuple]]) -> List[pd.DataFrame]:
     """
     Filters a list of DataFrames based on a corresponding list of schedule dates.
-    Only DataFrames whose schedule date is not None are kept. The date cell in the
-    kept DataFrames is updated with the new schedule date string.
+    Only DataFrames whose schedule date is not None are kept. 
+    The date cell in the kept DataFrames is updated with the new schedule date string.
+    The ISO date is attached to the DataFrame metadata (d.attrs['iso_date']).
 
     Args:
         data_frames (List[pd.DataFrame]): The list of DataFrames to filter.
-        schedule_dates (List[Optional[str]]): A list of generated schedule dates.
+        schedule_dates (List[Optional[tuple]]): A list of generated schedule date tuples (text, iso).
                                               Must correspond index-wise to data_frames.
 
     Returns:
         List[pd.DataFrame]: A new list containing only the DataFrames for valid, future dates,
-                            with their date cells updated.
+                            with their date cells updated and metadata attached.
     
     Note:
         It's crucial that `schedule_dates` is generated by a function like `generate_schedule_dates`
@@ -121,11 +123,16 @@ def filter_data_frames_by_date(data_frames: List[pd.DataFrame], schedule_dates: 
     for i, frame in enumerate(data_frames):
         if schedule_dates[i] is None: # Skip if the date was filtered out (e.g., past date)
             continue
-        #=====================================================================================PIENSO QUE PODEMOS USAR SOLO NUMEROS O LISTA DE BOOL, PARA NO TENER QUE PASAR LOS DATAFRAMES COMO RETURN
+        
+        date_text, iso_date = schedule_dates[i]
+
         # Create a copy to avoid modifying the original DataFrame in the input list
         updated_frame = frame.copy()
         # Update the date cell with the new formatted schedule date string
-        updated_frame.iat[DATE_ROW_INDEX, DATE_COLUMN_INDEX] = schedule_dates[i]
+        updated_frame.iat[DATE_ROW_INDEX, DATE_COLUMN_INDEX] = date_text
+        # Attach ISO date to metadata
+        updated_frame.attrs['iso_date'] = iso_date
+        
         filtered_data_frames.append(updated_frame)
         
     return filtered_data_frames

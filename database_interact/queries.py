@@ -333,6 +333,74 @@ def getId_by_normTitle(title_norm:str):
     res = _execute_query(R_BUSQUEDA, query, (title_norm,), fetch_one=True)
     return res[0]
 
+
+def ensure_history_table_exists():
+    """
+    Creates the 'Historial_Uso' table if it does not exist.
+    """
+    query = """
+    CREATE TABLE IF NOT EXISTS Historial_Uso (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_himno INTEGER NOT NULL,
+        fecha_uso TEXT NOT NULL,
+        tipo_evento TEXT,
+        FOREIGN KEY (id_himno) REFERENCES Himnos(id)
+    );
+    """
+    _execute_query(R_BUSQUEDA, query, commit=True)
+    logger.info("Checked/Created 'Historial_Uso' table.")
+
+
+def register_hymn_usage(hymn_id: int, date_iso: str, event_type: str = 'unknown'):
+    """
+    Registers the usage of a hymn on a specific date and event type.
+
+    Args:
+        hymn_id (int): The ID of the hymn.
+        date_iso (str): The date in ISO-8601 format (YYYY-MM-DD).
+        event_type (str): The type of event (e.g., 'sunday_service', 'test_migration').
+    """
+    query = """
+    INSERT INTO Historial_Uso (id_himno, fecha_uso, tipo_evento)
+    VALUES (?, ?, ?)
+    """
+    _execute_query(R_BUSQUEDA, query, params=(hymn_id, date_iso, event_type), commit=True)
+    logger.info(f"Registered usage for hymn {hymn_id} on {date_iso} ({event_type}).")
+
+
+def get_hymns_with_last_date() -> List[Tuple[int, Optional[str]]]:
+    """
+    Retrieves hymns with their last usage date.
+    Returns a list of tuples (hymn_id, last_usage_date).
+    """
+    query = """
+    SELECT H.id, MAX(HU.fecha_uso) as ultima_fecha
+    FROM Himnos H
+    LEFT JOIN Historial_Uso HU ON H.id = HU.id_himno
+    GROUP BY H.id
+    """
+    # Note: Using LEFT JOIN to include hymns even if they haven't been used yet, 
+    # though the requirement wording "JOIN" overlaps, the intent "Asignar fecha" usually implies we want to know for all or those with history.
+    # The validation script expects a list where d[0] is ID and d[1] is date.
+    
+    results = _execute_query(R_BUSQUEDA, query, fetch_all=True)
+    return results or []
+
+
+def get_usage_on_date(date_iso: str) -> List[int]:
+    """
+    Retrieves the list of hymn IDs used on a specific date.
+
+    Args:
+        date_iso (str): The date in ISO-8601 format (YYYY-MM-DD).
+
+    Returns:
+        List[int]: A list of hymn IDs.
+    """
+    query = "SELECT id_himno FROM Historial_Uso WHERE fecha_uso = ?"
+    results = _execute_query(R_BUSQUEDA, query, params=(date_iso,), fetch_all=True)
+    return [row[0] for row in results] if results else []
+
 def main():
     # Example usage or testing can go here
     # Test find_title_by_normalized_text
